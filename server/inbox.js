@@ -2,13 +2,15 @@ import fs from 'fs';
 import path from 'path';
 import { v4 as uuid } from 'uuid';
 import { parseDxf } from './dxf.js';
+import { ensureOutboxDirs } from './outbox.js';
 
 export const INBOX_DIR = path.join(process.cwd(), 'data', 'inbox');
 export const INBOX_PROCESSED_DIR = path.join(INBOX_DIR, 'processed');
-export const OUTBOX_DIR = path.join(process.cwd(), 'data', 'outbox');
+export const INBOX_POLL_MS = 5000;
 
 export function ensureInboxOutboxDirs() {
-  [INBOX_DIR, INBOX_PROCESSED_DIR, OUTBOX_DIR].forEach((d) => {
+  ensureOutboxDirs();
+  [INBOX_DIR, INBOX_PROCESSED_DIR].forEach((d) => {
     if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
   });
 }
@@ -86,10 +88,57 @@ export function importInboxFile(db, filename, { material = 'Black Steel', thickn
   return db.prepare('SELECT * FROM parts WHERE id = ?').get(id);
 }
 
-export function writeToOutbox(jobId, dxfContent) {
+export function listRecentProcessed(limit = 10) {
   ensureInboxOutboxDirs();
-  const outName = `nest-${jobId.slice(0, 8)}-ready.dxf`;
-  const outPath = path.join(OUTBOX_DIR, outName);
-  fs.writeFileSync(outPath, dxfContent);
-  return { path: outPath, filename: outName };
+  if (!fs.existsSync(INBOX_PROCESSED_DIR)) return [];
+  return fs.readdirSync(INBOX_PROCESSED_DIR, { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.dxf'))
+    .map((e) => {
+      const fullPath = path.join(INBOX_PROCESSED_DIR, e.name);
+      const stat = fs.statSync(fullPath);
+      return {
+        filename: e.name,
+        name: nameFromFilename(e.name),
+        size: stat.size,
+        processedAt: stat.mtime.toISOString(),
+      };
+    })
+    .sort((a, b) => new Date(b.processedAt) - new Date(a.processedAt))
+    .slice(0, limit);
+}
+
+/**
+ * Auto-import every DXF sitting in data/inbox/. Called on poll interval and app boot.
+ */
+export function autoImportInbox(db, { material = 'Black Steel', thickness = '1/4"' } = {}) {
+  const pending = listInboxFiles();
+  const imported = [];
+  const errors = [];
+
+  for (const { filename } of pending) {
+    try {
+      const row = importInboxFile(db, filename, { material, thickness, moveAfter: true });
+      imported.push({
+        filename,
+        partId: row.id,
+        name: row.name,
+      });
+    } catch (e) {
+      errors.push({ filename, error: e.message });
+    }
+  }
+
+  return { imported, errors, pending: listInboxFiles() };
+}
+
+export function startInboxWatcher(db) {
+  ensureInboxOutboxDirs();
+  autoImportInbox(db);
+  return setInterval(() => {
+    try {
+      autoImportInbox(db);
+    } catch (e) {
+      console.error('[inbox] auto-import error:', e.message);
+    }
+  }, INBOX_POLL_MS);
 }

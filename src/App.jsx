@@ -1,10 +1,9 @@
-import { Routes, Route, NavLink } from 'react-router-dom';
-import PartsPage from './pages/PartsPage';
+import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
+import HomePage from './pages/HomePage';
+import VaultPage from './pages/VaultPage';
 import InventoryPage from './pages/InventoryPage';
-import NestPage from './pages/NestPage';
 import JobsPage from './pages/JobsPage';
 import CleanupPage from './pages/CleanupPage';
-import InboxPage from './pages/InboxPage';
 import AuthBar from './components/AuthBar';
 
 export default function App() {
@@ -19,22 +18,23 @@ export default function App() {
           </div>
         </div>
         <nav>
-          <NavLink to="/" end>Drawings</NavLink>
-          <NavLink to="/inbox">Inbox</NavLink>
+          <NavLink to="/" end>Home</NavLink>
+          <NavLink to="/vault">Vault</NavLink>
           <NavLink to="/inventory">Inventory</NavLink>
-          <NavLink to="/nest">Nest</NavLink>
           <NavLink to="/jobs">Jobs</NavLink>
         </nav>
         <AuthBar />
       </header>
       <main className="main">
         <Routes>
-          <Route path="/" element={<PartsPage />} />
-          <Route path="/inbox" element={<InboxPage />} />
+          <Route path="/" element={<HomePage />} />
+          <Route path="/vault" element={<VaultPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
-          <Route path="/nest" element={<NestPage />} />
           <Route path="/jobs" element={<JobsPage />} />
           <Route path="/cleanup/:id" element={<CleanupPage />} />
+          <Route path="/inbox" element={<Navigate to="/" replace />} />
+          <Route path="/nest" element={<Navigate to="/" replace />} />
+          <Route path="/drawings" element={<Navigate to="/vault" replace />} />
         </Routes>
       </main>
     </div>

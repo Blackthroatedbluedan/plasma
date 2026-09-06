@@ -107,7 +107,7 @@ export default function CleanupPage() {
             Optional — nest and export work without running cleanup. Diagnose open contours, gaps, and junk; fix when you choose.
           </p>
         </div>
-        <Link to="/" className="btn btn-ghost">← Back to Drawings</Link>
+        <Link to="/vault" className="btn btn-ghost">← Back to Vault</Link>
       </div>
 
       {part && (

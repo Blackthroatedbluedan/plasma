@@ -12,7 +12,8 @@ import { nestParts, nestPreviewSvg } from './nesting.js';
 import { buildPartsQuery, nextRevision } from './parts.js';
 import { diagnoseGeometry, fixGeometry, exportCleanupDxf, CLEANUP_DEFAULTS } from './cleanup.js';
 import { MATERIALS, SHEET_PRESETS } from './seed.js';
-import { ensureInboxOutboxDirs, listInboxFiles, importInboxFile, writeToOutbox } from './inbox.js';
+import { ensureInboxOutboxDirs, listInboxFiles, listRecentProcessed, importInboxFile, startInboxWatcher } from './inbox.js';
+import { writeNestToOutbox, writePartToOutbox, sweepOutbox, getOutboxSweepInfo, startOutboxSweepScheduler } from './outbox.js';
 import {
   buildInventorySyncPayload,
   enqueueInventorySync,
@@ -51,7 +52,45 @@ app.get('/api/config', (_req, res) => {
 
 // --- Inbox / Outbox ---
 app.get('/api/inbox', (_req, res) => {
-  res.json({ files: listInboxFiles() });
+  res.json({
+    files: listInboxFiles(),
+    recentProcessed: listRecentProcessed(10),
+    autoImport: true,
+  });
+});
+
+app.get('/api/outbox', (_req, res) => {
+  res.json(getOutboxSweepInfo());
+});
+
+app.post('/api/outbox/sweep', (req, res) => {
+  try {
+    const force = req.body?.force === true;
+    const result = sweepOutbox({ force });
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/parts/:id/outbox', (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Part not found' });
+    if (!row.dxf_path || !fs.existsSync(row.dxf_path)) {
+      return res.status(404).json({ error: 'Original DXF file not available for this part' });
+    }
+    const content = fs.readFileSync(row.dxf_path, 'utf8');
+    const { filename, path: outPath } = writePartToOutbox(row, content);
+    res.json({
+      ok: true,
+      filename,
+      path: outPath,
+      message: `DXF written to data/outbox/${filename} for FlashCut pickup`,
+    });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 app.post('/api/inbox/import', (req, res) => {
@@ -377,7 +416,7 @@ app.post('/api/nest', (req, res) => {
     });
     const dxfPath = path.join(exportsDir, `${jobId}.dxf`);
     fs.writeFileSync(dxfPath, nestedDxf);
-    try { writeToOutbox(jobId, nestedDxf); } catch (_) {}
+    try { writeNestToOutbox(jobId, nestedDxf); } catch (_) {}
 
     db.prepare(`
       INSERT INTO jobs (id, sheet_id, material, thickness, sheet_width_in, sheet_height_in, parts_json, nest_json, yield_pct, scrap_pct, status, nested_dxf_path)
@@ -489,4 +528,6 @@ if (fs.existsSync(distPath)) {
 
 app.listen(PORT, () => {
   console.log(`Plasma server running on http://localhost:${PORT}`);
+  startInboxWatcher(db);
+  startOutboxSweepScheduler();
 });

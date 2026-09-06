@@ -6,8 +6,8 @@ Local-first web app that sits beside **FlashCut** on your Windows laptop. Plasma
 
 ## Features (v1 MVP)
 
-- **Drawing vault** — Searchable list of every shop DXF (name, material, gauge, customer, job, tags). Find lost drawings fast, then one-click into nest → FlashCut export
-- **Part library** — Import DXF, assign metadata, optional revision upload; bulk-select to nest
+- **Home** — Inbox window (auto-import from `data/inbox/`) + nest builder with live preview; exports to `data/outbox/`
+- **Drawing vault** — Searchable list of every shop DXF (name, material, gauge, customer, job, tags). Send single parts to outbox or add to nest
 - **Sheet & remnant inventory** — Full sheets + rectangular remnants with shop presets (never hard-limited)
 - **Nesting** — Bottom-left-fill with 90° rotation, configurable kerf/gap (~0.125" default), SVG preview
 - **DXF export** — Closed polylines on `PARTS` layer, sheet outline on `SHEET` layer
@@ -78,11 +78,15 @@ See [docs/klfsapps-inventory-callable.md](docs/klfsapps-inventory-callable.md) f
 
 ## Typical Workflow
 
-1. **Drawings** — Search the vault by name fragment, material, customer, or job; download original DXF or **Nest** a hit
-2. **Inventory** — Review seeded stock or add sheets/remnants
-3. **Nest** — Parts can arrive pre-selected from the vault; pick sheet, run nest, preview
+1. **Home** — Inbox window shows new DXFs (drop in `data/inbox/` — auto-imports to vault). Build a nest on the right; finished nests land in `data/outbox/` for FlashCut
+2. **Vault** — Search every shop DXF; send a single part to outbox or add to nest on Home
+3. **Inventory** — Review seeded stock or add sheets/remnants
 4. **Download nested DXF** → import into FlashCut for lead-ins/kerf/torch
 5. **Jobs** — Confirm cut → sheet consumed, add remnants if any
+
+### Outbox hygiene
+
+Files in `data/outbox/` are swept every **3 days**: older DXFs are archived to `data/outbox/archive/` (vault still holds originals; nest jobs stay in the job log). The server runs a sweep on boot and hourly so downtime does not skip cleanup. To test manually: `POST /api/outbox/sweep` with `{ "force": true }`.
 
 ## Sample DXFs
 
@@ -110,7 +114,7 @@ Optional, non-blocking tool to diagnose and fix messy DXF geometry (open contour
 
 ## Data Storage
 
-SQLite database at `data/plasma.db`. Uploaded DXFs in `data/uploads/`, exported nests in `data/exports/`. **Drop DXFs in `data/inbox/`** for vault import; **finished nests land in `data/outbox/`** for FlashCut pickup. Back up the `data/` folder to preserve inventory and parts.
+SQLite database at `data/plasma.db`. Uploaded DXFs in `data/uploads/`, exported nests in `data/exports/`. **Drop DXFs in `data/inbox/`** — they auto-import to the vault (no button click). **Finished nests and single-part exports land in `data/outbox/`** for FlashCut pickup; outbox files older than 3 days are archived automatically. Back up the `data/` folder to preserve inventory and parts.
 
 ## API Endpoints
 
@@ -129,8 +133,11 @@ SQLite database at `data/plasma.db`. Uploaded DXFs in `data/uploads/`, exported 
 | POST | `/api/inventory-sync/:id/complete` | Mark queue item synced (client after callable) |
 | POST | `/api/inventory-sync/:id/fail` | Record sync failure for retry |
 | GET | `/api/jobs/:id/dxf` | Download nested DXF |
-| GET | `/api/inbox` | List DXFs waiting in `data/inbox/` |
-| POST | `/api/inbox/import` | Import inbox DXFs to vault (default Black Steel 1/4") |
+| GET | `/api/inbox` | Inbox files + recently processed (auto-import enabled) |
+| POST | `/api/inbox/import` | Manual inbox import (legacy; auto-import is default) |
+| GET | `/api/outbox` | Outbox files + sweep metadata |
+| POST | `/api/outbox/sweep` | Force or catch-up outbox archive (`{ "force": true }`) |
+| POST | `/api/parts/:id/outbox` | Copy single-part DXF to outbox for FlashCut |
 
 ## Architecture
 
