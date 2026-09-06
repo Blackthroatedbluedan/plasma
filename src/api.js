@@ -35,6 +35,7 @@ export const api = {
   updateSheet: (id, body) => request(`/sheets/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   deleteSheet: (id) => request(`/sheets/${id}`, { method: 'DELETE' }),
   nest: (body) => request('/nest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  nestPreview: (body) => request('/nest/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   getJobs: () => request('/jobs'),
   getJob: (id) => request(`/jobs/${id}`),
   confirmJob: (id, body) => request(`/jobs/${id}/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),

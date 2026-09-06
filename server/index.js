@@ -8,7 +8,7 @@ import { v4 as uuid } from 'uuid';
 import db from './db.js';
 import './seed.js';
 import { parseDxf, exportNestedDxf } from './dxf.js';
-import { nestParts, nestPreviewSvg } from './nesting.js';
+import { nestParts, nestPreviewSvg, computeNestStats } from './nesting.js';
 import { buildPartsQuery, nextRevision } from './parts.js';
 import { diagnoseGeometry, fixGeometry, exportCleanupDxf, CLEANUP_DEFAULTS } from './cleanup.js';
 import { MATERIALS, SHEET_PRESETS } from './seed.js';
@@ -327,35 +327,93 @@ app.delete('/api/sheets/:id', (req, res) => {
 });
 
 // --- Nesting ---
+function resolveNestInputs({ partIds, quantities, sheetId, customSheet }) {
+  if (!partIds?.length) {
+    return { error: 'Select at least one part' };
+  }
+
+  let sheet;
+  if (sheetId) {
+    const s = db.prepare('SELECT * FROM sheets WHERE id = ? AND status = ?').get(sheetId, 'available');
+    if (!s) return { error: 'Sheet not available' };
+    sheet = { id: s.id, width: s.width_in, height: s.height_in, material: s.material, thickness: s.thickness };
+  } else if (customSheet) {
+    sheet = {
+      width: customSheet.width,
+      height: customSheet.height,
+      material: customSheet.material,
+      thickness: customSheet.thickness,
+    };
+  } else {
+    return { error: 'Select a sheet or provide custom dimensions' };
+  }
+
+  const parts = [];
+  for (const pid of partIds) {
+    const row = db.prepare('SELECT * FROM parts WHERE id = ?').get(pid);
+    if (!row) continue;
+    const geom = JSON.parse(row.geometry_json);
+    parts.push({
+      id: row.id,
+      name: row.name,
+      polylines: geom.polylines,
+      qty: quantities?.[pid] ?? row.qty ?? 1,
+    });
+  }
+
+  if (!parts.length) {
+    return { error: 'No valid parts selected' };
+  }
+
+  return { sheet, parts };
+}
+
+function buildNestPreviewResponse(sheet, parts, result) {
+  const requestedTotal = parts.reduce((sum, p) => sum + (p.qty || 1), 0);
+  const placedCount = result.placements?.length ?? 0;
+  const stats = computeNestStats(result.placements || [], sheet);
+  const partial = !result.success && placedCount > 0;
+
+  return {
+    success: result.success,
+    error: result.error,
+    placements: result.placements,
+    yieldPct: stats.yieldPct,
+    scrapPct: stats.scrapPct,
+    requestedTotal,
+    placedCount,
+    partial,
+    previewSvg: nestPreviewSvg(result, sheet, { partial }),
+    sheet: {
+      width: sheet.width,
+      height: sheet.height,
+      material: sheet.material,
+      thickness: sheet.thickness,
+    },
+  };
+}
+
+app.post('/api/nest/preview', (req, res) => {
+  try {
+    const { partIds, quantities, sheetId, customSheet, kerf } = req.body;
+    const resolved = resolveNestInputs({ partIds, quantities, sheetId, customSheet });
+    if (resolved.error) return res.status(400).json({ error: resolved.error });
+
+    const { sheet, parts } = resolved;
+    const result = nestParts(parts, sheet, { kerf: kerf ?? 0.125 });
+    res.json(buildNestPreviewResponse(sheet, parts, result));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/api/nest', (req, res) => {
   try {
     const { partIds, quantities, sheetId, kerf, customSheet } = req.body;
-    if (!partIds?.length) return res.status(400).json({ error: 'Select at least one part' });
+    const resolved = resolveNestInputs({ partIds, quantities, sheetId, customSheet });
+    if (resolved.error) return res.status(400).json({ error: resolved.error });
 
-    let sheet;
-    if (sheetId) {
-      const s = db.prepare('SELECT * FROM sheets WHERE id = ? AND status = ?').get(sheetId, 'available');
-      if (!s) return res.status(400).json({ error: 'Sheet not available' });
-      sheet = { id: s.id, width: s.width_in, height: s.height_in, material: s.material, thickness: s.thickness };
-    } else if (customSheet) {
-      sheet = { width: customSheet.width, height: customSheet.height, material: customSheet.material, thickness: customSheet.thickness };
-    } else {
-      return res.status(400).json({ error: 'Select a sheet or provide custom dimensions' });
-    }
-
-    const parts = [];
-    for (const pid of partIds) {
-      const row = db.prepare('SELECT * FROM parts WHERE id = ?').get(pid);
-      if (!row) continue;
-      const geom = JSON.parse(row.geometry_json);
-      parts.push({
-        id: row.id,
-        name: row.name,
-        polylines: geom.polylines,
-        qty: quantities?.[pid] ?? row.qty ?? 1,
-      });
-    }
-
+    const { sheet, parts } = resolved;
     const result = nestParts(parts, sheet, { kerf: kerf ?? 0.125 });
     if (!result.success) return res.status(400).json(result);
 
