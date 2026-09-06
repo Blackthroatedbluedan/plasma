@@ -69,6 +69,11 @@ Open **http://localhost:3847** — single server serves API + UI. Works fully of
 | `samples/plate-8x8.dxf` | 8"×8" plate with center hole |
 | `samples/gusset-pair.dxf` | Two small gussets |
 | `samples/washer-4in.dxf` | 4" OD washer (circle) |
+| `samples/test-parts/` | Five shop-realistic test DXFs for pre-go-live exercise |
+
+## E2E validation
+
+Screenshots, nest preview SVG, sample nested DXF export, and API test report from a full vault → nest → FlashCut hand-off run are in [`docs/e2e/`](docs/e2e/). Re-run locally with `npm start` then `./scripts/e2e-test.sh`.
 
 ## Data Storage
 
