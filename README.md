@@ -121,6 +121,10 @@ plasma/
 
 Default spacing between parts is **0.125"** (⅛"). Adjust on the Nest page. FlashCut applies its own kerf compensation during import — Plasma spacing is for nest clearance only.
 
+## Future vision
+
+See [docs/VISION.md](docs/VISION.md) for near-term foundation work, ~1-year goals (drawing AI and jobsite messaging), and long-horizon direction. Horizons are labeled; nothing here replaces operator review or proven cut paths until the shop says so.
+
 ## License
 
 MIT
