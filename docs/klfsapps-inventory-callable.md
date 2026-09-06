@@ -16,6 +16,7 @@ Implement or align the callable in KLFSapps; Plasma targets the contract below.
 
 **Name:** `recordPlasmaMaterialUse`  
 **Region:** `us-central1` (override in Plasma via `VITE_FIREBASE_FUNCTIONS_REGION`)  
+**Status:** **LIVE** — deployed revision `recordplasmamaterialuse-00001-qil` (us-central1). Plasma calls it via Firebase SDK `httpsCallable` using the name and region above — no hardcoded URL.  
 **Auth:** Firebase Auth ID token — Google sign-in, **`@klfs.ca` email allowlist** (same pattern as Inventory UI)
 
 ### Request
