@@ -71,12 +71,26 @@ db.exec(`
     FOREIGN KEY (job_id) REFERENCES jobs(id),
     FOREIGN KEY (sheet_id) REFERENCES sheets(id)
   );
+
+  CREATE TABLE IF NOT EXISTS inventory_sync_queue (
+    id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    attempts INTEGER DEFAULT 0,
+    last_error TEXT,
+    transaction_id TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    synced_at TEXT,
+    FOREIGN KEY (job_id) REFERENCES jobs(id)
+  );
 `);
 
 for (const sql of [
   'ALTER TABLE parts ADD COLUMN customer TEXT DEFAULT ""',
   'ALTER TABLE parts ADD COLUMN job_ref TEXT DEFAULT ""',
   'ALTER TABLE parts ADD COLUMN tags TEXT DEFAULT ""',
+  'ALTER TABLE jobs ADD COLUMN inventory_sync_status TEXT',
 ]) {
   try { db.exec(sql); } catch (_) { /* column exists */ }
 }

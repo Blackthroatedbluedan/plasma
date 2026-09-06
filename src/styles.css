@@ -277,3 +277,34 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 .issue-warn { color: #ffb74d; }
 .issue-info { color: var(--muted); }
 
+.auth-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  font-size: 0.85rem;
+}
+.auth-bar-muted { color: var(--muted); }
+.auth-email {
+  color: var(--muted);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auth-error { color: #ff8a80; font-size: 0.8rem; }
+
+.badge-warn { background: rgba(243, 156, 18, 0.2); color: var(--warn); }
+.badge-muted { background: var(--surface2); color: var(--muted); }
+.badge-klfs-pending { background: rgba(243, 156, 18, 0.2); color: var(--warn); }
+.badge-klfs-synced { background: rgba(46, 204, 113, 0.2); color: var(--accent2); }
+.badge-klfs-failed { background: rgba(231, 76, 60, 0.2); color: var(--danger); }
+
+.alert-warn {
+  background: rgba(243, 156, 18, 0.12);
+  border: 1px solid rgba(243, 156, 18, 0.35);
+  color: var(--text);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+}
+

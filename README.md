@@ -53,6 +53,29 @@ npm start
 
 Open **http://localhost:3847** — single server serves API + UI. Works fully offline after install.
 
+## KLFS inventory sync (Confirm cut → KLFSapps)
+
+On **Confirm cut**, Plasma queues material use for **KLFSapps** sheet inventory (Firebase project `gen-lang-client-0901687565`) via the HTTPS callable `recordPlasmaMaterialUse`. Local sheet consumption and remnants are unchanged; KLFS sync is best-effort when online.
+
+1. Copy `.env.example` → `.env`
+2. For local UI/dev without Firebase: keep `VITE_FIREBASE_MOCK=true` (default in example)
+3. For real KLFS sync: set `VITE_FIREBASE_*` from the Firebase console web app config, set `VITE_FIREBASE_MOCK=false`, restart `npm run dev`
+4. Sign in with Google (`@klfs.ca` only) in the header — session persists across restarts
+5. Confirm cut on **Jobs** — pending sync rows retry automatically and via **Retry sync**
+
+See [docs/klfsapps-inventory-callable.md](docs/klfsapps-inventory-callable.md) for the callable contract (KLFSapps repo: `cnc-sheet-inventory`).
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `VITE_FIREBASE_API_KEY` | yes* | Firebase web API key |
+| `VITE_FIREBASE_AUTH_DOMAIN` | yes* | Auth domain |
+| `VITE_FIREBASE_PROJECT_ID` | yes* | `gen-lang-client-0901687565` |
+| `VITE_FIREBASE_APP_ID` | yes* | Firebase web app ID |
+| `VITE_FIREBASE_MOCK` | no | `true` = mock callable for offline dev |
+| `VITE_FIREBASE_FUNCTIONS_REGION` | no | Default `us-central1` |
+
+\*Not required when `VITE_FIREBASE_MOCK=true`.
+
 ## Typical Workflow
 
 1. **Drawings** — Search the vault by name fragment, material, customer, or job; download original DXF or **Nest** a hit
@@ -101,7 +124,10 @@ SQLite database at `data/plasma.db`. Uploaded DXFs in `data/uploads/`, exported 
 | GET/POST | `/api/sheets` | List / add inventory |
 | POST | `/api/nest` | Run nesting, create pending job |
 | GET | `/api/jobs` | Job history |
-| POST | `/api/jobs/:id/confirm` | Confirm cut, consume sheet, add remnants |
+| POST | `/api/jobs/:id/confirm` | Confirm cut, consume sheet, add remnants, queue KLFS sync |
+| GET | `/api/inventory-sync/pending` | Pending KLFS inventory sync queue |
+| POST | `/api/inventory-sync/:id/complete` | Mark queue item synced (client after callable) |
+| POST | `/api/inventory-sync/:id/fail` | Record sync failure for retry |
 | GET | `/api/jobs/:id/dxf` | Download nested DXF |
 | GET | `/api/inbox` | List DXFs waiting in `data/inbox/` |
 | POST | `/api/inbox/import` | Import inbox DXFs to vault (default Black Steel 1/4") |
