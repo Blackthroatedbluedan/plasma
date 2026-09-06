@@ -402,6 +402,41 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   color: var(--text);
 }
 
+.inline-rename-label {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: text;
+  border-bottom: 1px dashed transparent;
+}
+.inline-rename-label:hover,
+.inline-rename-label:focus-visible {
+  border-bottom-color: var(--accent);
+  outline: none;
+}
+.inline-rename-strong {
+  font-weight: 600;
+}
+.inline-rename-input {
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  min-width: 6rem;
+  max-width: 100%;
+}
+.inline-rename-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.25);
+}
+
 .nest-sheet-row {
   display: flex;
   align-items: center;

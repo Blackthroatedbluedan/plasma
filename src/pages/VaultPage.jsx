@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import OutboxBar from '../components/OutboxBar';
+import InlinePartRename from '../components/InlinePartRename';
 
 function useDebounced(value, delay = 300) {
   const [debounced, setDebounced] = useState(value);
@@ -115,6 +116,15 @@ export default function VaultPage() {
     load();
   };
 
+  const handlePartRenamed = (updated, errMsg) => {
+    if (errMsg) {
+      setError(errMsg);
+      return;
+    }
+    if (!updated) return;
+    setParts((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+  };
+
   return (
     <div>
       <h2 className="page-title">Vault</h2>
@@ -198,7 +208,12 @@ export default function VaultPage() {
                 <tr key={p.id} className={highlightId === p.id ? 'row-highlight' : ''}>
                   <td><PartThumb geometry={p.geometry} /></td>
                   <td>
-                    <strong>{p.name}</strong>
+                    <InlinePartRename
+                      partId={p.id}
+                      name={p.name}
+                      onRenamed={handlePartRenamed}
+                      className="inline-rename-strong"
+                    />
                     {p.tags && <div className="tag-line">{p.tags}</div>}
                     {p.notes && <div className="muted-line">{p.notes}</div>}
                   </td>

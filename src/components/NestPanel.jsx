@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../api';
 import PartSearchModal from './PartSearchModal';
 import NestCanvas from './NestCanvas';
+import InlinePartRename from './InlinePartRename';
 import { checkPlacementCollisions } from '../utils/nestGeometry';
 
 const PREVIEW_DEBOUNCE_MS = 400;
@@ -165,6 +166,17 @@ export default function NestPanel({ preselectIds = [], onPreselectConsumed }) {
     window.open(`/api/jobs/${exportResult.jobId}/dxf`, '_blank');
   };
 
+  const handlePartRenamed = (updated, errMsg) => {
+    if (errMsg) {
+      setError(errMsg);
+      return;
+    }
+    if (!updated) return;
+    setSelectedParts((prev) => prev.map((p) => (p.id === updated.id ? { ...p, name: updated.name } : p)));
+    setParts((prev) => prev.map((p) => (p.id === updated.id ? { ...p, name: updated.name } : p)));
+    setPlacements((prev) => prev?.map((pl) => (pl.partId === updated.id ? { ...pl, name: updated.name } : pl)) ?? prev);
+  };
+
   const displayPlacements = placements ?? preview?.placements ?? [];
   const yieldPct = preview?.yieldPct;
 
@@ -183,7 +195,15 @@ export default function NestPanel({ preselectIds = [], onPreselectConsumed }) {
         <ul className="nest-part-list">
           {selectedParts.map((p) => (
             <li key={p.id}>
-              <span><strong>{p.name}</strong> <span className="muted-line">{p.material} {p.thickness}</span></span>
+              <span>
+                <InlinePartRename
+                  partId={p.id}
+                  name={p.name}
+                  onRenamed={handlePartRenamed}
+                  className="inline-rename-strong"
+                />
+                <span className="muted-line"> {p.material} {p.thickness}</span>
+              </span>
               <div className="nest-part-controls">
                 <input
                   type="number" min="1" value={quantities[p.id] || 1}
