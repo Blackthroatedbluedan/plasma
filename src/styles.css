@@ -243,6 +243,37 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   max-width: 640px;
 }
 
-.vault-table .actions {
+.badge-experimental { background: rgba(155, 89, 182, 0.25); color: #bb86fc; }
+
+.cleanup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
   flex-wrap: wrap;
 }
+
+.cleanup-summary {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+
+.issue-list {
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  font-size: 0.85rem;
+}
+.issue-list li {
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.issue-error { color: #ff8a80; }
+.issue-warn { color: #ffb74d; }
+.issue-info { color: var(--muted); }
+

@@ -75,6 +75,15 @@ Open **http://localhost:3847** — single server serves API + UI. Works fully of
 
 Screenshots, nest preview SVG, sample nested DXF export, and API test report from a full vault → nest → FlashCut hand-off run are in [`docs/e2e/`](docs/e2e/). Re-run locally with `npm start` then `./scripts/e2e-test.sh`.
 
+## Experimental: Geometry Cleanup add-on
+
+Optional, non-blocking tool to diagnose and fix messy DXF geometry (open contours, endpoint gaps, tiny fragments, duplicate edges). Reach it from **Cleanup** on any drawing row — nest and export never require it.
+
+- Settings: snap/join tolerance (default 0.02"), min segment length (default 0.05")
+- Actions: join endpoints, close near-gaps, strip junk, remove duplicates
+- Save cleaned DXF as a new revision or download — never overwrites without your action
+- Demo dirty file: `samples/bracket-dirty-open.dxf` (intentional open gap + frayed lines)
+
 ## Data Storage
 
 SQLite database at `data/plasma.db`. Uploaded DXFs in `data/uploads/`, exported nests in `data/exports/`. Back up the `data/` folder to preserve inventory and parts.

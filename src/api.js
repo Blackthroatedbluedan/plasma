@@ -38,4 +38,8 @@ export const api = {
   getJobs: () => request('/jobs'),
   getJob: (id) => request(`/jobs/${id}`),
   confirmJob: (id, body) => request(`/jobs/${id}/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  getCleanupDefaults: () => request('/cleanup/defaults'),
+  cleanupDiagnose: (id, body) => request(`/parts/${id}/cleanup/diagnose`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  cleanupFix: (id, body) => request(`/parts/${id}/cleanup/fix`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  cleanupSaveRevision: (id, body) => request(`/parts/${id}/cleanup/save-revision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
 };

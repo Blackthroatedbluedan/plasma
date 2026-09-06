@@ -10,6 +10,7 @@ import './seed.js';
 import { parseDxf, exportNestedDxf } from './dxf.js';
 import { nestParts, nestPreviewSvg } from './nesting.js';
 import { buildPartsQuery, nextRevision } from './parts.js';
+import { diagnoseGeometry, fixGeometry, exportCleanupDxf, CLEANUP_DEFAULTS } from './cleanup.js';
 import { MATERIALS, SHEET_PRESETS } from './seed.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -154,6 +155,86 @@ app.delete('/api/parts/:id', (req, res) => {
   if (existing.dxf_path && fs.existsSync(existing.dxf_path)) fs.unlinkSync(existing.dxf_path);
   db.prepare('DELETE FROM parts WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
+});
+
+// --- Geometry cleanup (optional add-on; does not gate nest/export) ---
+function loadPartDxfContent(row) {
+  if (row.dxf_path && fs.existsSync(row.dxf_path)) {
+    return fs.readFileSync(row.dxf_path, 'utf8');
+  }
+  if (row.geometry_json) {
+    const geom = JSON.parse(row.geometry_json);
+    if (geom.polylines?.length) {
+      return exportCleanupDxf(geom.polylines);
+    }
+  }
+  return null;
+}
+
+app.get('/api/cleanup/defaults', (_req, res) => {
+  res.json(CLEANUP_DEFAULTS);
+});
+
+app.post('/api/parts/:id/cleanup/diagnose', (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Part not found' });
+    const content = loadPartDxfContent(row);
+    if (!content) return res.status(400).json({ error: 'No DXF geometry available for this part' });
+    const { snapTolerance, minSegmentLength } = req.body || {};
+    res.json(diagnoseGeometry(content, { snapTolerance, minSegmentLength }));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.post('/api/parts/:id/cleanup/fix', (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Part not found' });
+    const content = loadPartDxfContent(row);
+    if (!content) return res.status(400).json({ error: 'No DXF geometry available for this part' });
+    const { snapTolerance, minSegmentLength, actions } = req.body || {};
+    const result = fixGeometry(content, { snapTolerance, minSegmentLength, actions });
+    res.json({
+      ...result,
+      beforeDiagnosis: diagnoseGeometry(content, { snapTolerance, minSegmentLength }),
+    });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.post('/api/parts/:id/cleanup/save-revision', (req, res) => {
+  try {
+    const existing = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Part not found' });
+    const { dxfContent, revision } = req.body || {};
+    if (!dxfContent) return res.status(400).json({ error: 'dxfContent is required' });
+
+    const geometry = parseDxf(dxfContent);
+    const newRev = revision?.trim() || nextRevision(existing.revision);
+    const destPath = path.join(uploadsDir, `${uuid()}.dxf`);
+    fs.writeFileSync(destPath, dxfContent);
+
+    if (existing.dxf_path && fs.existsSync(existing.dxf_path)) {
+      try { fs.unlinkSync(existing.dxf_path); } catch (_) {}
+    }
+
+    db.prepare(`
+      UPDATE parts SET
+        revision = ?, dxf_path = ?, geometry_json = ?, bbox_width = ?, bbox_height = ?,
+        updated_at = datetime('now')
+      WHERE id = ?
+    `).run(
+      newRev, destPath, JSON.stringify(geometry), geometry.bbox.width, geometry.bbox.height,
+      req.params.id
+    );
+
+    res.json(deserializePart(db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id)));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 // --- Sheets ---

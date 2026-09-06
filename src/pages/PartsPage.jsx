@@ -333,6 +333,7 @@ export default function PartsPage() {
                     <div className="actions">
                       <button className="btn btn-primary btn-sm" onClick={() => goToNest([p.id])} title="Open Nest with this part">Nest</button>
                       <a className="btn btn-ghost btn-sm" href={api.partDxfUrl(p.id)} download title="Download original DXF">DXF</a>
+                      <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/cleanup/${p.id}`)} title="Optional geometry cleanup">Cleanup</button>
                       <button className="btn btn-ghost btn-sm" onClick={() => { setRevisePart(p); setRevRevision(''); setRevDxfFile(null); }}>Rev</button>
                       <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.id)}>Del</button>
                     </div>

@@ -3,6 +3,7 @@ import PartsPage from './pages/PartsPage';
 import InventoryPage from './pages/InventoryPage';
 import NestPage from './pages/NestPage';
 import JobsPage from './pages/JobsPage';
+import CleanupPage from './pages/CleanupPage';
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/nest" element={<NestPage />} />
           <Route path="/jobs" element={<JobsPage />} />
+          <Route path="/cleanup/:id" element={<CleanupPage />} />
         </Routes>
       </main>
     </div>
