@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 
 export default function NestPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [parts, setParts] = useState([]);
   const [sheets, setSheets] = useState([]);
   const [selected, setSelected] = useState({});
@@ -13,9 +15,31 @@ export default function NestPage() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [preselectedNote, setPreselectedNote] = useState('');
 
   useEffect(() => {
-    api.getParts().then(setParts);
+    api.getParts().then(({ parts: list }) => {
+      setParts(list);
+      const fromUrl = (searchParams.get('parts') || '').split(',').filter(Boolean);
+      if (fromUrl.length) {
+        const nextSelected = {};
+        const nextQty = {};
+        for (const id of fromUrl) {
+          const p = list.find((x) => x.id === id);
+          if (p) {
+            nextSelected[id] = true;
+            nextQty[id] = p.qty || 1;
+            if (!filterMat) setFilterMat(p.material);
+            if (!filterThick) setFilterThick(p.thickness);
+          }
+        }
+        setSelected(nextSelected);
+        setQuantities(nextQty);
+        const names = fromUrl.map((id) => list.find((x) => x.id === id)?.name).filter(Boolean);
+        if (names.length) setPreselectedNote(names.join(', '));
+        setSearchParams({}, { replace: true });
+      }
+    });
     api.getSheets({ status: 'available' }).then(setSheets);
   }, []);
 
@@ -58,6 +82,7 @@ export default function NestPage() {
         kerf,
       });
       setResult(res);
+      setPreselectedNote('');
     } catch (e) {
       setError(e.message);
     } finally {
@@ -74,6 +99,12 @@ export default function NestPage() {
     <div>
       <h2 className="page-title">Nesting</h2>
       <p className="page-desc">Select parts and a matching sheet. Preview the nest, export DXF for FlashCut import.</p>
+
+      {preselectedNote && (
+        <div className="alert alert-info">
+          From drawing vault: <strong>{preselectedNote}</strong> — pick a sheet and run nest.
+        </div>
+      )}
 
       <div className="toolbar">
         <select value={filterMat} onChange={(e) => { setFilterMat(e.target.value); setSheetId(''); }}>
@@ -92,9 +123,9 @@ export default function NestPage() {
 
       <div className="grid-2">
         <div className="card">
-          <h3>Parts</h3>
+          <h3>Parts ({selectedIds.length} selected)</h3>
           {filteredParts.length === 0 ? (
-            <div className="empty">No parts. Import DXFs first.</div>
+            <div className="empty">No parts. Import DXFs in the drawing vault first.</div>
           ) : (
             filteredParts.map((p) => (
               <div key={p.id} className="checkbox-row">

@@ -16,7 +16,7 @@ export default function App() {
           </div>
         </div>
         <nav>
-          <NavLink to="/" end>Parts</NavLink>
+          <NavLink to="/" end>Drawings</NavLink>
           <NavLink to="/inventory">Inventory</NavLink>
           <NavLink to="/nest">Nest</NavLink>
           <NavLink to="/jobs">Jobs</NavLink>

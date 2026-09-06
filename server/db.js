@@ -73,4 +73,12 @@ db.exec(`
   );
 `);
 
+for (const sql of [
+  'ALTER TABLE parts ADD COLUMN customer TEXT DEFAULT ""',
+  'ALTER TABLE parts ADD COLUMN job_ref TEXT DEFAULT ""',
+  'ALTER TABLE parts ADD COLUMN tags TEXT DEFAULT ""',
+]) {
+  try { db.exec(sql); } catch (_) { /* column exists */ }
+}
+
 export default db;

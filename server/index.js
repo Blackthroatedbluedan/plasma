@@ -9,6 +9,7 @@ import db from './db.js';
 import './seed.js';
 import { parseDxf, exportNestedDxf } from './dxf.js';
 import { nestParts, nestPreviewSvg } from './nesting.js';
+import { buildPartsQuery, nextRevision } from './parts.js';
 import { MATERIALS, SHEET_PRESETS } from './seed.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -37,21 +38,52 @@ app.get('/api/config', (_req, res) => {
   res.json({ materials: MATERIALS, sheetPresets: SHEET_PRESETS });
 });
 
-// --- Parts ---
+// --- Parts / drawing vault ---
 app.get('/api/parts', (req, res) => {
-  const { q, material, thickness } = req.query;
-  let sql = 'SELECT * FROM parts WHERE 1=1';
-  const params = [];
-  if (q) {
-    sql += ' AND (name LIKE ? OR notes LIKE ? OR revision LIKE ?)';
-    const like = `%${q}%`;
-    params.push(like, like, like);
-  }
-  if (material) { sql += ' AND material = ?'; params.push(material); }
-  if (thickness) { sql += ' AND thickness = ?'; params.push(thickness); }
-  sql += ' ORDER BY updated_at DESC';
+  const { sql, params } = buildPartsQuery(req.query);
   const rows = db.prepare(sql).all(...params);
-  res.json(rows.map(deserializePart));
+  const parts = rows.map(deserializePart);
+  res.json({ parts, total: parts.length });
+});
+
+app.get('/api/parts/:id/dxf', (req, res) => {
+  const row = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'Part not found' });
+  if (!row.dxf_path || !fs.existsSync(row.dxf_path)) {
+    return res.status(404).json({ error: 'Original DXF file not available for this part' });
+  }
+  const safeName = (row.name || 'part').replace(/[^\w.-]+/g, '_');
+  res.download(row.dxf_path, `${safeName}-rev${row.revision}.dxf`);
+});
+
+app.post('/api/parts/:id/revision', upload.single('dxf'), (req, res) => {
+  try {
+    const existing = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Part not found' });
+    if (!req.file) return res.status(400).json({ error: 'DXF file required' });
+
+    const content = fs.readFileSync(req.file.path, 'utf8');
+    const geometry = parseDxf(content);
+    const revision = req.body.revision?.trim() || nextRevision(existing.revision);
+
+    if (existing.dxf_path && fs.existsSync(existing.dxf_path)) {
+      try { fs.unlinkSync(existing.dxf_path); } catch (_) {}
+    }
+
+    db.prepare(`
+      UPDATE parts SET
+        revision = ?, dxf_path = ?, geometry_json = ?, bbox_width = ?, bbox_height = ?,
+        notes = COALESCE(?, notes), updated_at = datetime('now')
+      WHERE id = ?
+    `).run(
+      revision, req.file.path, JSON.stringify(geometry), geometry.bbox.width, geometry.bbox.height,
+      req.body.notes || null, req.params.id
+    );
+
+    res.json(deserializePart(db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id)));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 app.get('/api/parts/:id', (req, res) => {
@@ -62,7 +94,7 @@ app.get('/api/parts/:id', (req, res) => {
 
 app.post('/api/parts', upload.single('dxf'), (req, res) => {
   try {
-    const { name, material, thickness, notes, qty, revision } = req.body;
+    const { name, material, thickness, notes, qty, revision, customer, job_ref, tags } = req.body;
     if (!name || !material || !thickness) {
       return res.status(400).json({ error: 'name, material, and thickness are required' });
     }
@@ -81,10 +113,14 @@ app.post('/api/parts', upload.single('dxf'), (req, res) => {
 
     const id = uuid();
     db.prepare(`
-      INSERT INTO parts (id, name, material, thickness, notes, qty, revision, dxf_path, geometry_json, bbox_width, bbox_height)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO parts (
+        id, name, material, thickness, notes, qty, revision, customer, job_ref, tags,
+        dxf_path, geometry_json, bbox_width, bbox_height
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, name, material, thickness, notes || '', parseInt(qty) || 1, revision || 'A',
+      customer || '', job_ref || '', tags || '',
       dxfPath, JSON.stringify(geometry), geometry.bbox.width, geometry.bbox.height
     );
     const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(id);
@@ -97,13 +133,17 @@ app.post('/api/parts', upload.single('dxf'), (req, res) => {
 app.put('/api/parts/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Part not found' });
-  const { name, material, thickness, notes, qty, revision } = req.body;
+  const { name, material, thickness, notes, qty, revision, customer, job_ref, tags } = req.body;
   db.prepare(`
-    UPDATE parts SET name=?, material=?, thickness=?, notes=?, qty=?, revision=?, updated_at=datetime('now')
+    UPDATE parts SET
+      name=?, material=?, thickness=?, notes=?, qty=?, revision=?,
+      customer=?, job_ref=?, tags=?, updated_at=datetime('now')
     WHERE id=?
   `).run(
     name ?? existing.name, material ?? existing.material, thickness ?? existing.thickness,
-    notes ?? existing.notes, qty ?? existing.qty, revision ?? existing.revision, req.params.id
+    notes ?? existing.notes, qty ?? existing.qty, revision ?? existing.revision,
+    customer ?? existing.customer, job_ref ?? existing.job_ref, tags ?? existing.tags,
+    req.params.id
   );
   res.json(deserializePart(db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id)));
 });

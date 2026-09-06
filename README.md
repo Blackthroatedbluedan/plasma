@@ -6,7 +6,8 @@ Local-first web app that sits beside **FlashCut** on your Windows laptop. Plasma
 
 ## Features (v1 MVP)
 
-- **Part library** — Import DXF, assign name/material/thickness/qty/revision; search and delete
+- **Drawing vault** — Searchable list of every shop DXF (name, material, gauge, customer, job, tags). Find lost drawings fast, then one-click into nest → FlashCut export
+- **Part library** — Import DXF, assign metadata, optional revision upload; bulk-select to nest
 - **Sheet & remnant inventory** — Full sheets + rectangular remnants with shop presets (never hard-limited)
 - **Nesting** — Bottom-left-fill with 90° rotation, configurable kerf/gap (~0.125" default), SVG preview
 - **DXF export** — Closed polylines on `PARTS` layer, sheet outline on `SHEET` layer
@@ -54,12 +55,11 @@ Open **http://localhost:3847** — single server serves API + UI. Works fully of
 
 ## Typical Workflow
 
-1. **Inventory** — Review seeded stock or add sheets/remnants
-2. **Parts** — Import DXF from `samples/` (e.g. `bracket-6x4.dxf`, `plate-8x8.dxf`)
-3. **Nest** — Select parts + qty, pick matching sheet, set kerf, run nest
-4. **Preview** — Check SVG layout, download nested DXF
-5. **FlashCut** — Import DXF, configure lead-ins/kerf, cut
-6. **Jobs** — Confirm cut → sheet consumed, add remnants if any
+1. **Drawings** — Search the vault by name fragment, material, customer, or job; download original DXF or **Nest** a hit
+2. **Inventory** — Review seeded stock or add sheets/remnants
+3. **Nest** — Parts can arrive pre-selected from the vault; pick sheet, run nest, preview
+4. **Download nested DXF** → import into FlashCut for lead-ins/kerf/torch
+5. **Jobs** — Confirm cut → sheet consumed, add remnants if any
 
 ## Sample DXFs
 
@@ -79,7 +79,10 @@ SQLite database at `data/plasma.db`. Uploaded DXFs in `data/uploads/`, exported 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/config` | Materials, gauges, sheet presets |
-| GET/POST | `/api/parts` | List / import parts |
+| GET | `/api/parts` | Search drawings (`q`, `material`, `thickness`, `sort=name\|recent`) → `{ parts, total }` |
+| POST | `/api/parts` | Import DXF to vault |
+| GET | `/api/parts/:id/dxf` | Download original part DXF |
+| POST | `/api/parts/:id/revision` | Upload new DXF revision |
 | GET/POST | `/api/sheets` | List / add inventory |
 | POST | `/api/nest` | Run nesting, create pending job |
 | GET | `/api/jobs` | Job history |

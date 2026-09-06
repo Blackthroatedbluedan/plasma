@@ -191,3 +191,58 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   border-radius: 4px;
   overflow: hidden;
 }
+
+.vault-toolbar .search-input {
+  flex: 1;
+  min-width: 220px;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+.vault-toolbar .search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.vault-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.vault-table .tag-line {
+  font-size: 0.75rem;
+  color: var(--accent);
+  margin-top: 0.15rem;
+}
+.vault-table .muted-line {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+.row-highlight td {
+  background: rgba(74, 158, 255, 0.12) !important;
+}
+
+.modal-wide {
+  max-width: 640px;
+}
+
+.vault-table .actions {
+  flex-wrap: wrap;
+}

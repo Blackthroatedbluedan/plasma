@@ -19,6 +19,12 @@ export const api = {
     if (!r.ok) throw new Error(d.error);
     return d;
   }),
+  uploadRevision: (id, formData) => fetch(`${BASE}/parts/${id}/revision`, { method: 'POST', body: formData }).then(async (r) => {
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    return d;
+  }),
+  partDxfUrl: (id) => `${BASE}/parts/${id}/dxf`,
   updatePart: (id, body) => request(`/parts/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   deletePart: (id) => request(`/parts/${id}`, { method: 'DELETE' }),
   getSheets: (params = {}) => {

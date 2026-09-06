@@ -80,16 +80,22 @@ function seedDemoParts() {
   if (count > 0) return;
 
   const samples = [
-    { file: 'bracket-6x4.dxf', name: 'Bracket 6×4', material: 'Black Steel', thickness: '1/4"', qty: 4, revision: 'A' },
-    { file: 'plate-8x8.dxf', name: 'Plate 8×8', material: 'Black Steel', thickness: '1/4"', qty: 2, revision: 'B' },
-    { file: 'gusset-pair.dxf', name: 'Gusset Pair', material: 'Black Steel', thickness: '3/16"', qty: 6, revision: 'A' },
-    { file: 'washer-4in.dxf', name: 'Washer 4"', material: 'Black Steel', thickness: '1/4"', qty: 12, revision: 'A' },
+    { file: 'bracket-6x4.dxf', name: 'Bracket 6×4', material: 'Black Steel', thickness: '1/4"', qty: 4, revision: 'A', customer: 'Acme Fab', job_ref: 'JOB-2401', tags: 'bracket, mounting' },
+    { file: 'plate-8x8.dxf', name: 'Plate 8×8', material: 'Black Steel', thickness: '1/4"', qty: 2, revision: 'B', customer: 'Acme Fab', job_ref: 'JOB-2401', tags: 'plate, base' },
+    { file: 'gusset-pair.dxf', name: 'Gusset Pair', material: 'Black Steel', thickness: '3/16"', qty: 6, revision: 'A', customer: 'River City', job_ref: 'RC-118', tags: 'gusset, structural' },
+    { file: 'washer-4in.dxf', name: 'Washer 4"', material: 'Black Steel', thickness: '1/4"', qty: 12, revision: 'A', customer: '', job_ref: '', tags: 'washer, round' },
   ];
 
   const insert = db.prepare(`
-    INSERT INTO parts (id, name, material, thickness, notes, qty, revision, geometry_json, bbox_width, bbox_height)
-    VALUES (?, ?, ?, ?, '', ?, ?, ?, ?, ?)
+    INSERT INTO parts (
+      id, name, material, thickness, notes, qty, revision, customer, job_ref, tags,
+      dxf_path, geometry_json, bbox_width, bbox_height
+    )
+    VALUES (?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
+
+  const uploadsDir = path.join(__dirname, '..', 'data', 'uploads');
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
   const samplesDir = path.join(__dirname, '..', 'samples');
   const tx = db.transaction(() => {
@@ -98,9 +104,13 @@ function seedDemoParts() {
       if (!fs.existsSync(filePath)) continue;
       const content = fs.readFileSync(filePath, 'utf8');
       const geometry = parseDxf(content);
+      const id = uuid();
+      const destPath = path.join(uploadsDir, `${id}.dxf`);
+      fs.copyFileSync(filePath, destPath);
       insert.run(
-        uuid(), s.name, s.material, s.thickness, s.qty, s.revision,
-        JSON.stringify(geometry), geometry.bbox.width, geometry.bbox.height
+        id, s.name, s.material, s.thickness, s.qty, s.revision,
+        s.customer || '', s.job_ref || '', s.tags || '',
+        destPath, JSON.stringify(geometry), geometry.bbox.width, geometry.bbox.height
       );
     }
   });
