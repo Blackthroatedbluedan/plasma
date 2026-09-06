@@ -12,6 +12,7 @@ import { nestParts, nestPreviewSvg } from './nesting.js';
 import { buildPartsQuery, nextRevision } from './parts.js';
 import { diagnoseGeometry, fixGeometry, exportCleanupDxf, CLEANUP_DEFAULTS } from './cleanup.js';
 import { MATERIALS, SHEET_PRESETS } from './seed.js';
+import { ensureInboxOutboxDirs, listInboxFiles, importInboxFile, writeToOutbox } from './inbox.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(__dirname, '..', 'data', 'uploads');
@@ -19,6 +20,7 @@ const exportsDir = path.join(__dirname, '..', 'data', 'exports');
 [uploadsDir, exportsDir].forEach((d) => {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 });
+ensureInboxOutboxDirs();
 
 const upload = multer({ dest: uploadsDir });
 
@@ -37,6 +39,45 @@ if (fs.existsSync(distPath)) {
 // --- Config ---
 app.get('/api/config', (_req, res) => {
   res.json({ materials: MATERIALS, sheetPresets: SHEET_PRESETS });
+});
+
+// --- Inbox / Outbox ---
+app.get('/api/inbox', (_req, res) => {
+  res.json({ files: listInboxFiles() });
+});
+
+app.post('/api/inbox/import', (req, res) => {
+  try {
+    const { filenames, material, thickness, moveAfter } = req.body || {};
+    const toImport = filenames?.length
+      ? filenames
+      : listInboxFiles().map((f) => f.filename);
+    if (!toImport.length) {
+      return res.status(400).json({ error: 'No DXF files in inbox to import' });
+    }
+
+    const imported = [];
+    const errors = [];
+    for (const filename of toImport) {
+      try {
+        const row = importInboxFile(db, filename, {
+          material: material || 'Black Steel',
+          thickness: thickness || '1/4"',
+          moveAfter: moveAfter !== false,
+        });
+        imported.push(deserializePart(row));
+      } catch (e) {
+        errors.push({ filename, error: e.message });
+      }
+    }
+
+    if (!imported.length) {
+      return res.status(400).json({ error: errors[0]?.error || 'Import failed', errors });
+    }
+    res.json({ imported, errors });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 // --- Parts / drawing vault ---
@@ -328,6 +369,7 @@ app.post('/api/nest', (req, res) => {
     });
     const dxfPath = path.join(exportsDir, `${jobId}.dxf`);
     fs.writeFileSync(dxfPath, nestedDxf);
+    try { writeToOutbox(jobId, nestedDxf); } catch (_) {}
 
     db.prepare(`
       INSERT INTO jobs (id, sheet_id, material, thickness, sheet_width_in, sheet_height_in, parts_json, nest_json, yield_pct, scrap_pct, status, nested_dxf_path)

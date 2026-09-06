@@ -69,6 +69,7 @@ Open **http://localhost:3847** — single server serves API + UI. Works fully of
 | `samples/plate-8x8.dxf` | 8"×8" plate with center hole |
 | `samples/gusset-pair.dxf` | Two small gussets |
 | `samples/washer-4in.dxf` | 4" OD washer (circle) |
+| `samples/plate-12x12-dirty.dxf` | 12"×12" plate with holes, open gap + frayed junk (cleanup demo) |
 | `samples/test-parts/` | Five shop-realistic test DXFs for pre-go-live exercise |
 
 ## E2E validation
@@ -86,7 +87,7 @@ Optional, non-blocking tool to diagnose and fix messy DXF geometry (open contour
 
 ## Data Storage
 
-SQLite database at `data/plasma.db`. Uploaded DXFs in `data/uploads/`, exported nests in `data/exports/`. Back up the `data/` folder to preserve inventory and parts.
+SQLite database at `data/plasma.db`. Uploaded DXFs in `data/uploads/`, exported nests in `data/exports/`. **Drop DXFs in `data/inbox/`** for vault import; **finished nests land in `data/outbox/`** for FlashCut pickup. Back up the `data/` folder to preserve inventory and parts.
 
 ## API Endpoints
 
@@ -102,6 +103,8 @@ SQLite database at `data/plasma.db`. Uploaded DXFs in `data/uploads/`, exported 
 | GET | `/api/jobs` | Job history |
 | POST | `/api/jobs/:id/confirm` | Confirm cut, consume sheet, add remnants |
 | GET | `/api/jobs/:id/dxf` | Download nested DXF |
+| GET | `/api/inbox` | List DXFs waiting in `data/inbox/` |
+| POST | `/api/inbox/import` | Import inbox DXFs to vault (default Black Steel 1/4") |
 
 ## Architecture
 

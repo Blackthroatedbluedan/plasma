@@ -4,6 +4,7 @@ import InventoryPage from './pages/InventoryPage';
 import NestPage from './pages/NestPage';
 import JobsPage from './pages/JobsPage';
 import CleanupPage from './pages/CleanupPage';
+import InboxPage from './pages/InboxPage';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         </div>
         <nav>
           <NavLink to="/" end>Drawings</NavLink>
+          <NavLink to="/inbox">Inbox</NavLink>
           <NavLink to="/inventory">Inventory</NavLink>
           <NavLink to="/nest">Nest</NavLink>
           <NavLink to="/jobs">Jobs</NavLink>
@@ -26,6 +28,7 @@ export default function App() {
       <main className="main">
         <Routes>
           <Route path="/" element={<PartsPage />} />
+          <Route path="/inbox" element={<InboxPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/nest" element={<NestPage />} />
           <Route path="/jobs" element={<JobsPage />} />
