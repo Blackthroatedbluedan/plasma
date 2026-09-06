@@ -13,6 +13,14 @@ import { buildPartsQuery, nextRevision } from './parts.js';
 import { diagnoseGeometry, fixGeometry, exportCleanupDxf, CLEANUP_DEFAULTS } from './cleanup.js';
 import { MATERIALS, SHEET_PRESETS } from './seed.js';
 import { ensureInboxOutboxDirs, listInboxFiles, importInboxFile, writeToOutbox } from './inbox.js';
+import {
+  buildInventorySyncPayload,
+  enqueueInventorySync,
+  listPendingInventorySync,
+  markInventorySyncComplete,
+  markInventorySyncFailed,
+  getInventorySyncSummary,
+} from './inventorySync.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(__dirname, '..', 'data', 'uploads');
@@ -436,7 +444,33 @@ app.post('/api/jobs/:id/confirm', (req, res) => {
   });
   tx();
 
-  res.json(db.prepare('SELECT * FROM jobs WHERE id = ?').get(req.params.id));
+  const validRemnants = remnants?.filter((r) => r.width_in > 0 && r.height_in > 0) || [];
+  const payload = buildInventorySyncPayload(j, validRemnants);
+  const syncQueueId = enqueueInventorySync(j.id, payload);
+
+  const updated = db.prepare('SELECT * FROM jobs WHERE id = ?').get(req.params.id);
+  res.json({ ...updated, inventorySyncQueueId: syncQueueId });
+});
+
+// --- KLFSapps inventory sync queue (client calls Firebase callable; server persists queue) ---
+app.get('/api/inventory-sync/pending', (_req, res) => {
+  res.json({ items: listPendingInventorySync(), summary: getInventorySyncSummary() });
+});
+
+app.post('/api/inventory-sync/:id/complete', (req, res) => {
+  const { transactionId } = req.body || {};
+  if (!transactionId) return res.status(400).json({ error: 'transactionId required' });
+  const row = markInventorySyncComplete(req.params.id, transactionId);
+  if (!row) return res.status(404).json({ error: 'Queue item not found' });
+  res.json(row);
+});
+
+app.post('/api/inventory-sync/:id/fail', (req, res) => {
+  const { error } = req.body || {};
+  if (!error) return res.status(400).json({ error: 'error message required' });
+  const row = markInventorySyncFailed(req.params.id, error);
+  if (!row) return res.status(404).json({ error: 'Queue item not found' });
+  res.json(row);
 });
 
 function deserializePart(row) {

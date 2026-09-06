@@ -5,6 +5,7 @@ import NestPage from './pages/NestPage';
 import JobsPage from './pages/JobsPage';
 import CleanupPage from './pages/CleanupPage';
 import InboxPage from './pages/InboxPage';
+import AuthBar from './components/AuthBar';
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <NavLink to="/nest">Nest</NavLink>
           <NavLink to="/jobs">Jobs</NavLink>
         </nav>
+        <AuthBar />
       </header>
       <main className="main">
         <Routes>
