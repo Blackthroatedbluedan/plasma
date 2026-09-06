@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
+import OutboxBar from '../components/OutboxBar';
 
 function useDebounced(value, delay = 300) {
   const [debounced, setDebounced] = useState(value);
@@ -35,10 +36,11 @@ function formatDate(iso) {
 
 export default function VaultPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [parts, setParts] = useState([]);
   const [total, setTotal] = useState(0);
   const [config, setConfig] = useState({ materials: {}, sheetPresets: [] });
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('q') || '');
   const debouncedSearch = useDebounced(search);
   const [filterMat, setFilterMat] = useState('');
   const [sort, setSort] = useState('recent');
@@ -232,6 +234,8 @@ export default function VaultPage() {
           </table>
         )}
       </div>
+
+      <OutboxBar />
     </div>
   );
 }

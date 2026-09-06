@@ -86,7 +86,9 @@ See [docs/klfsapps-inventory-callable.md](docs/klfsapps-inventory-callable.md) f
 
 ### Outbox hygiene
 
-Files in `data/outbox/` are swept every **3 days**: older DXFs are archived to `data/outbox/archive/` (vault still holds originals; nest jobs stay in the job log). The server runs a sweep on boot and hourly so downtime does not skip cleanup. To test manually: `POST /api/outbox/sweep` with `{ "force": true }`.
+Files in `data/outbox/` are swept every **3 days**: older DXFs are archived to `data/outbox/archive/` (vault still holds originals; nest jobs stay in the job log). The server runs a sweep on boot and hourly so downtime does not skip cleanup.
+
+**Demo / dev:** `npm run demo:sweep` forces an immediate archive. Override retention with `OUTBOX_RETENTION_DAYS=0.001` (minutes-scale) for testing without force. See `npm run demo:prep` for a full screen-recording walkthrough script.
 
 ## Sample DXFs
 

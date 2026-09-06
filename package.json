@@ -10,7 +10,9 @@
     "dev:client": "vite",
     "build": "vite build",
     "start": "node server/index.js",
-    "seed": "node server/seed.js"
+    "seed": "node server/seed.js",
+    "demo:prep": "bash scripts/demo-walkthrough.sh",
+    "demo:sweep": "bash scripts/demo-sweep.sh"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",

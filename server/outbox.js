@@ -6,7 +6,8 @@ export const OUTBOX_ARCHIVE_DIR = path.join(OUTBOX_DIR, 'archive');
 const SWEEP_STATE_FILE = path.join(process.cwd(), 'data', '.outbox-sweep.json');
 
 /** Files older than this are swept from outbox back to vault custody (removed from outbox). */
-export const OUTBOX_RETENTION_MS = 3 * 24 * 60 * 60 * 1000;
+const retentionDays = parseFloat(process.env.OUTBOX_RETENTION_DAYS || '3');
+export const OUTBOX_RETENTION_MS = retentionDays * 24 * 60 * 60 * 1000;
 
 export function ensureOutboxDirs() {
   [OUTBOX_DIR, OUTBOX_ARCHIVE_DIR].forEach((d) => {

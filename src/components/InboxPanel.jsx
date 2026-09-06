@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api';
 
 function formatSize(bytes) {
@@ -15,11 +16,19 @@ export default function InboxPanel() {
   const [files, setFiles] = useState([]);
   const [recentProcessed, setRecentProcessed] = useState([]);
   const [error, setError] = useState('');
+  const [justImported, setJustImported] = useState(null);
+  const prevRecentRef = useRef([]);
 
   const load = useCallback(() => {
     api.getInbox()
       .then(({ files: list, recentProcessed: recent }) => {
         setFiles(list);
+        const prev = prevRecentRef.current;
+        if (recent?.length && recent[0]?.filename !== prev[0]?.filename) {
+          setJustImported(recent[0]);
+          setTimeout(() => setJustImported(null), 8000);
+        }
+        prevRecentRef.current = recent || [];
         setRecentProcessed(recent || []);
       })
       .catch((e) => setError(e.message));
@@ -27,7 +36,7 @@ export default function InboxPanel() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 5000);
+    const t = setInterval(load, 2000);
     return () => clearInterval(t);
   }, [load]);
 
@@ -39,6 +48,12 @@ export default function InboxPanel() {
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
+      {justImported && (
+        <div className="alert alert-success">
+          Imported <strong>{justImported.name}</strong> →{' '}
+          <Link to={`/vault?q=${encodeURIComponent(justImported.name)}`}>open in Vault</Link>
+        </div>
+      )}
 
       <div className="inbox-section">
         <h4>Waiting</h4>
@@ -62,7 +77,9 @@ export default function InboxPanel() {
           <ul className="inbox-list muted">
             {recentProcessed.map((f) => (
               <li key={f.filename}>
-                <span className="inbox-name">{f.name}</span>
+                <Link to={`/vault?q=${encodeURIComponent(f.name)}`} className="inbox-name inbox-link">
+                  {f.name}
+                </Link>
                 <span className="inbox-meta">{formatDate(f.processedAt)}</span>
               </li>
             ))}
