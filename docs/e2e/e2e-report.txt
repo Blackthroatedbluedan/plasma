@@ -1,0 +1,34 @@
+Plasma E2E — 2026-09-06T03:14:29Z
+API: http://localhost:3847/api
+---
+
+STEP 1: Import test DXFs into vault
+  imported: Panel 5x10 Slotted (8f0f8a6f-d84d-43e6-a61f-0ebd16da6179)
+  imported: Flange 8in Bolt Circle (ec80e5a6-f255-4c35-864c-4e5a3376423f)
+  imported: Bracket L Simple (f3a5b6c8-ef43-4c1c-8d14-86fc368bf6c9)
+  imported: Plate 14x10 Center Hole (a57eae46-b675-400f-b200-0ad4b8b6f2aa)
+  imported: Gusset Triangle (8931e945-9ee5-4ce8-9f50-a6336b4a7aae)
+PASS: Imported 5 test parts (vault total: 9)
+
+STEP 2: Search vault
+PASS: Search 'flange' → 1 Flange 8in Bolt Circle
+PASS: Filter Black Steel 1/4" → 6 hits
+PASS: Search job E2E-001 → 2 hits
+
+STEP 3: Nest multiple parts on 5x10 Black Steel 1/4"
+  sheet: f03e1c46-f274-42d0-909e-2e035a533a11
+PASS: Nest OK — job 3fbdee38-6bbd-4827-9980-48ff3e86d120, yield 1.9479076611295922%
+  saved /opt/cursor/artifacts/nest-preview.svg 5549 bytes
+
+STEP 4: Export nested DXF
+  size: 4277 bytes
+  PARTS layer: True
+  SHEET layer: True
+  LWPOLYLINE entities: True
+PASS: DXF has PARTS/SHEET layers and geometry
+
+STEP 5: Confirm cut / inventory
+PASS: Job confirmed — sheet consumed, remnant added (available sheets: 8 → 8)
+PASS: Completed jobs: 1
+
+=== ALL STEPS PASSED ===

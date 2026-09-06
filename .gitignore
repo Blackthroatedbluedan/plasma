@@ -1,0 +1,9 @@
+data/
+uploads/
+exports/
+*.db
+*.db-wal
+*.db-shm
+node_modules/
+dist/
+.DS_Store
