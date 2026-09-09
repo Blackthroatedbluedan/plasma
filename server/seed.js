@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import db from './db.js';
 import { parseDxf } from './dxf.js';
+import { ensureDataSubdir, getProjectRoot } from './paths.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -94,10 +95,8 @@ function seedDemoParts() {
     VALUES (?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  const uploadsDir = path.join(__dirname, '..', 'data', 'uploads');
-  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
-  const samplesDir = path.join(__dirname, '..', 'samples');
+  const uploadsDir = ensureDataSubdir('uploads');
+  const samplesDir = path.join(getProjectRoot(), 'samples');
   const tx = db.transaction(() => {
     for (const s of samples) {
       const filePath = path.join(samplesDir, s.file);

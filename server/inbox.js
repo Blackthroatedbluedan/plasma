@@ -3,25 +3,31 @@ import path from 'path';
 import { v4 as uuid } from 'uuid';
 import { parseDxf } from './dxf.js';
 import { ensureOutboxDirs } from './outbox.js';
+import { getDataDir, ensureDataSubdir } from './paths.js';
 
-export const INBOX_DIR = path.join(process.cwd(), 'data', 'inbox');
-export const INBOX_PROCESSED_DIR = path.join(INBOX_DIR, 'processed');
+function inboxDir() {
+  return path.join(getDataDir(), 'inbox');
+}
+
+function inboxProcessedDir() {
+  return path.join(inboxDir(), 'processed');
+}
 export const INBOX_POLL_MS = 5000;
 
 export function ensureInboxOutboxDirs() {
   ensureOutboxDirs();
-  [INBOX_DIR, INBOX_PROCESSED_DIR].forEach((d) => {
-    if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-  });
+  ensureDataSubdir('inbox');
+  ensureDataSubdir('inbox', 'processed');
 }
 
 export function listInboxFiles() {
   ensureInboxOutboxDirs();
-  if (!fs.existsSync(INBOX_DIR)) return [];
-  return fs.readdirSync(INBOX_DIR, { withFileTypes: true })
+  const dir = inboxDir();
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.dxf'))
     .map((e) => {
-      const fullPath = path.join(INBOX_DIR, e.name);
+      const fullPath = path.join(dir, e.name);
       const stat = fs.statSync(fullPath);
       return {
         filename: e.name,
@@ -40,21 +46,21 @@ export function nameFromFilename(filename) {
 }
 
 function moveToProcessed(filename) {
-  const src = path.join(INBOX_DIR, filename);
+  const src = path.join(inboxDir(), filename);
   if (!fs.existsSync(src)) return;
   ensureInboxOutboxDirs();
-  const dest = path.join(INBOX_PROCESSED_DIR, filename);
+  const dest = path.join(inboxProcessedDir(), filename);
   let finalDest = dest;
   if (fs.existsSync(dest)) {
     const ext = path.extname(filename);
     const base = path.basename(filename, ext);
-    finalDest = path.join(INBOX_PROCESSED_DIR, `${base}-${Date.now()}${ext}`);
+    finalDest = path.join(inboxProcessedDir(), `${base}-${Date.now()}${ext}`);
   }
   fs.renameSync(src, finalDest);
 }
 
 export function importInboxFile(db, filename, { material = 'Black Steel', thickness = '1/4"', moveAfter = true } = {}) {
-  const src = path.join(INBOX_DIR, filename);
+  const src = path.join(inboxDir(), filename);
   if (!fs.existsSync(src)) {
     throw new Error(`File not found in inbox: ${filename}`);
   }
@@ -66,7 +72,7 @@ export function importInboxFile(db, filename, { material = 'Black Steel', thickn
   const geometry = parseDxf(content);
   const name = nameFromFilename(filename);
   const id = uuid();
-  const destPath = path.join(process.cwd(), 'data', 'uploads', `${id}.dxf`);
+  const destPath = path.join(ensureDataSubdir('uploads'), `${id}.dxf`);
   fs.copyFileSync(src, destPath);
 
   db.prepare(`
@@ -90,11 +96,12 @@ export function importInboxFile(db, filename, { material = 'Black Steel', thickn
 
 export function listRecentProcessed(limit = 10) {
   ensureInboxOutboxDirs();
-  if (!fs.existsSync(INBOX_PROCESSED_DIR)) return [];
-  return fs.readdirSync(INBOX_PROCESSED_DIR, { withFileTypes: true })
+  const processedDir = inboxProcessedDir();
+  if (!fs.existsSync(processedDir)) return [];
+  return fs.readdirSync(processedDir, { withFileTypes: true })
     .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.dxf'))
     .map((e) => {
-      const fullPath = path.join(INBOX_PROCESSED_DIR, e.name);
+      const fullPath = path.join(processedDir, e.name);
       const stat = fs.statSync(fullPath);
       return {
         filename: e.name,

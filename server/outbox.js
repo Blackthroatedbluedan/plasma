@@ -1,27 +1,36 @@
 import fs from 'fs';
 import path from 'path';
+import { getDataDir, ensureDataSubdir } from './paths.js';
 
-export const OUTBOX_DIR = path.join(process.cwd(), 'data', 'outbox');
-export const OUTBOX_ARCHIVE_DIR = path.join(OUTBOX_DIR, 'archive');
-const SWEEP_STATE_FILE = path.join(process.cwd(), 'data', '.outbox-sweep.json');
+function outboxDir() {
+  return path.join(getDataDir(), 'outbox');
+}
+
+function outboxArchiveDir() {
+  return path.join(outboxDir(), 'archive');
+}
+
+function sweepStateFile() {
+  return path.join(getDataDir(), '.outbox-sweep.json');
+}
 
 /** Files older than this are swept from outbox back to vault custody (removed from outbox). */
 const retentionDays = parseFloat(process.env.OUTBOX_RETENTION_DAYS || '3');
 export const OUTBOX_RETENTION_MS = retentionDays * 24 * 60 * 60 * 1000;
 
 export function ensureOutboxDirs() {
-  [OUTBOX_DIR, OUTBOX_ARCHIVE_DIR].forEach((d) => {
-    if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-  });
+  ensureDataSubdir('outbox');
+  ensureDataSubdir('outbox', 'archive');
 }
 
 export function listOutboxFiles() {
   ensureOutboxDirs();
-  if (!fs.existsSync(OUTBOX_DIR)) return [];
-  return fs.readdirSync(OUTBOX_DIR, { withFileTypes: true })
+  const dir = outboxDir();
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.dxf'))
     .map((e) => {
-      const fullPath = path.join(OUTBOX_DIR, e.name);
+      const fullPath = path.join(dir, e.name);
       const stat = fs.statSync(fullPath);
       const ageMs = Date.now() - stat.mtimeMs;
       return {
@@ -39,7 +48,7 @@ export function listOutboxFiles() {
 export function writeNestToOutbox(jobId, dxfContent) {
   ensureOutboxDirs();
   const outName = `nest-${jobId.slice(0, 8)}-ready.dxf`;
-  const outPath = path.join(OUTBOX_DIR, outName);
+  const outPath = path.join(outboxDir(), outName);
   fs.writeFileSync(outPath, dxfContent);
   return { path: outPath, filename: outName };
 }
@@ -48,9 +57,9 @@ export function writePartToOutbox(part, dxfContent) {
   ensureOutboxDirs();
   const safeName = (part.name || 'part').replace(/[^\w.-]+/g, '_');
   const outName = `part-${safeName}-rev${part.revision}-ready.dxf`;
-  let outPath = path.join(OUTBOX_DIR, outName);
+  let outPath = path.join(outboxDir(), outName);
   if (fs.existsSync(outPath)) {
-    outPath = path.join(OUTBOX_DIR, `part-${safeName}-rev${part.revision}-${Date.now()}-ready.dxf`);
+    outPath = path.join(outboxDir(), `part-${safeName}-rev${part.revision}-${Date.now()}-ready.dxf`);
   }
   fs.writeFileSync(outPath, dxfContent);
   return { path: outPath, filename: path.basename(outPath) };
@@ -58,17 +67,19 @@ export function writePartToOutbox(part, dxfContent) {
 
 function readSweepState() {
   try {
-    if (fs.existsSync(SWEEP_STATE_FILE)) {
-      return JSON.parse(fs.readFileSync(SWEEP_STATE_FILE, 'utf8'));
+    const statePath = sweepStateFile();
+    if (fs.existsSync(statePath)) {
+      return JSON.parse(fs.readFileSync(statePath, 'utf8'));
     }
   } catch (_) {}
   return { lastSweepAt: null, lastArchived: [] };
 }
 
 function writeSweepState(state) {
-  const dataDir = path.dirname(SWEEP_STATE_FILE);
+  const statePath = sweepStateFile();
+  const dataDir = path.dirname(statePath);
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-  fs.writeFileSync(SWEEP_STATE_FILE, JSON.stringify(state, null, 2));
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
 }
 
 /**
@@ -82,15 +93,16 @@ export function sweepOutbox({ force = false } = {}) {
   const state = readSweepState();
   const files = listOutboxFiles();
   const archived = [];
+  const dir = outboxDir();
 
   for (const file of files) {
-    const fullPath = path.join(OUTBOX_DIR, file.filename);
+    const fullPath = path.join(dir, file.filename);
     const stat = fs.statSync(fullPath);
     const ageMs = now - stat.mtimeMs;
     if (!force && ageMs < OUTBOX_RETENTION_MS) continue;
 
     const archiveName = `${path.basename(file.filename, '.dxf')}-${stat.mtimeMs}.dxf`;
-    const archivePath = path.join(OUTBOX_ARCHIVE_DIR, archiveName);
+    const archivePath = path.join(outboxArchiveDir(), archiveName);
     fs.renameSync(fullPath, archivePath);
     archived.push({ filename: file.filename, archivedAs: archiveName, kind: file.kind });
   }
