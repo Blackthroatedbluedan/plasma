@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
+import { ensureDataSubdir, getDistPath } from './paths.js';
 import db from './db.js';
 import './seed.js';
 import { parseDxf, exportNestedDxf } from './dxf.js';
@@ -23,24 +24,19 @@ import {
   getInventorySyncSummary,
 } from './inventorySync.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadsDir = path.join(__dirname, '..', 'data', 'uploads');
-const exportsDir = path.join(__dirname, '..', 'data', 'exports');
-[uploadsDir, exportsDir].forEach((d) => {
-  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-});
+const uploadsDir = ensureDataSubdir('uploads');
+const exportsDir = ensureDataSubdir('exports');
 ensureInboxOutboxDirs();
 
 const upload = multer({ dest: uploadsDir });
 
 const app = express();
-const PORT = process.env.PORT || 3847;
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 // Serve built client in production
-const distPath = path.join(__dirname, '..', 'dist');
+const distPath = getDistPath();
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
 }
@@ -562,8 +558,36 @@ if (fs.existsSync(distPath)) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`Plasma server running on http://localhost:${PORT}`);
-  startInboxWatcher(db);
-  startOutboxSweepScheduler();
-});
+export function startPlasmaServer(options = {}) {
+  const port = Number(options.port ?? process.env.PORT ?? 3847);
+  const host = options.host ?? process.env.PLASMA_HOST ?? undefined;
+  let inboxTimer;
+  let outboxTimer;
+
+  const server = app.listen(port, host, () => {
+    const hostLabel = host || 'localhost';
+    console.log(`Plasma server running on http://${hostLabel}:${port}`);
+    inboxTimer = startInboxWatcher(db);
+    outboxTimer = startOutboxSweepScheduler();
+  });
+
+  const stop = () => new Promise((resolve) => {
+    if (inboxTimer) clearInterval(inboxTimer);
+    if (outboxTimer) clearInterval(outboxTimer);
+    server.close(() => resolve());
+  });
+
+  return { server, port, stop };
+}
+
+const isMain = process.argv[1]
+  && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+
+if (isMain) {
+  const { stop } = startPlasmaServer();
+  const shutdown = () => {
+    stop().finally(() => process.exit(0));
+  };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
+}

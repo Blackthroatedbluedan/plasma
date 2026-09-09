@@ -1,10 +1,9 @@
 import Database from 'better-sqlite3';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { getDataDir } from './paths.js';
 import fs from 'fs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = path.join(__dirname, '..', 'data');
+const dataDir = getDataDir();
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const dbPath = path.join(dataDir, 'plasma.db');

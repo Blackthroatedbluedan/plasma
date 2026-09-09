@@ -53,6 +53,60 @@ npm start
 
 Open **http://localhost:3847** — single server serves API + UI. Works fully offline after install.
 
+## Desktop app (Windows)
+
+Plasma ships as an **Electron** desktop app for the FlashCut shop laptop — one icon, one window, no browser tab.
+
+### Run locally (dev)
+
+```powershell
+npm install
+npm run desktop
+```
+
+`npm run desktop` builds the Vite UI and opens a **Plasma** window. The embedded Express server starts automatically. Use `npm run electron` if you already ran `npm run build`.
+
+`npm start` (browser mode) is unchanged for existing workflows.
+
+`better-sqlite3` is compiled for Electron when you run desktop mode. To switch back to browser/`npm start` or `npm run dev`, run `npm run rebuild:node`.
+
+### Data location (desktop)
+
+On first launch the app creates shop data under:
+
+| OS | Path |
+|----|------|
+| **Windows** | `%APPDATA%\Plasma\data\` |
+| macOS | `~/Library/Application Support/Plasma/data/` |
+| Linux | `~/.config/Plasma/data/` |
+
+Inside that folder:
+
+- `plasma.db` — SQLite database
+- `inbox/` — drop DXFs for auto-import
+- `outbox/` — nested DXFs for FlashCut pickup
+- `uploads/`, `exports/` — vault uploads and nest exports
+
+Override with `PLASMA_DATA_DIR` if needed. Browser/`npm start` mode still uses `./data/` in the project folder.
+
+### Build installer for FlashCut laptop
+
+Build on a **Windows x64** machine (or CI) with Node 18+:
+
+```powershell
+npm install
+npm run desktop:pack
+```
+
+Output in `release/`:
+
+- **`Plasma Setup 1.0.0.exe`** — NSIS installer (Start menu + optional desktop shortcut)
+- `npm run desktop:pack:portable` — single **`Plasma-Portable.exe`** (no installer)
+
+Copy the installer to `C:\Plasma` on the shop laptop, run it, and pin **Plasma** to the taskbar. Closing the window quits the app and stops the server. Launching again while already open focuses the existing window (single instance).
+
+Recommended shop install path: `C:\Plasma` (or accept the NSIS default under `%LOCALAPPDATA%\Programs\Plasma`).
+
 ## KLFS inventory sync (Confirm cut → KLFSapps)
 
 On **Confirm cut**, Plasma queues material use for **KLFSapps** sheet inventory (Firebase project `gen-lang-client-0901687565`) via the HTTPS callable `recordPlasmaMaterialUse`. Local sheet consumption and remnants are unchanged; KLFS sync is best-effort when online.
@@ -116,7 +170,7 @@ Optional, non-blocking tool to diagnose and fix messy DXF geometry (open contour
 
 ## Data Storage
 
-SQLite database at `data/plasma.db`. Uploaded DXFs in `data/uploads/`, exported nests in `data/exports/`. **Drop DXFs in `data/inbox/`** — they auto-import to the vault (no button click). **Finished nests and single-part exports land in `data/outbox/`** for FlashCut pickup; outbox files older than 3 days are archived automatically. Back up the `data/` folder to preserve inventory and parts.
+SQLite database at `data/plasma.db` (or `%APPDATA%\Plasma\data\plasma.db` in desktop mode). Uploaded DXFs in `data/uploads/`, exported nests in `data/exports/`. **Drop DXFs in `data/inbox/`** — they auto-import to the vault (no button click). **Finished nests and single-part exports land in `data/outbox/`** for FlashCut pickup; outbox files older than 3 days are archived automatically. Back up the `data/` folder to preserve inventory and parts.
 
 ## API Endpoints
 
@@ -147,12 +201,14 @@ SQLite database at `data/plasma.db`. Uploaded DXFs in `data/uploads/`, exported 
 plasma/
 ├── server/          Express API + SQLite + nesting engine
 │   ├── db.js        Schema
+│   ├── paths.js     Data directory resolution (browser vs desktop)
 │   ├── seed.js      Shop stock seed data
 │   ├── dxf.js       DXF parse & export
 │   └── nesting.js   Bottom-left-fill nest (90° rotation)
+├── electron/        Desktop shell (starts server + BrowserWindow)
 ├── src/             Vite + React UI
 ├── samples/         Demo DXF files
-└── data/            SQLite DB (created on first run)
+└── data/            SQLite DB (created on first run; browser mode)
 ```
 
 ## Kerf / Gap
