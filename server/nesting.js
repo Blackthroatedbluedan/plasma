@@ -166,14 +166,23 @@ export function nestParts(parts, sheet, options = {}) {
   };
 }
 
-export function nestPreviewSvg(result, sheet) {
+export function computeNestStats(placements, sheet) {
+  const partArea = placements.reduce((s, p) => s + polyArea(p.polylines), 0);
+  const sheetArea = sheet.width * sheet.height;
+  const yieldPct = sheetArea > 0 ? (partArea / sheetArea) * 100 : 0;
+  return { yieldPct, scrapPct: 100 - yieldPct };
+}
+
+export function nestPreviewSvg(result, sheet, options = {}) {
   const scale = 4;
   const pad = 20;
   const w = sheet.width * scale + pad * 2;
   const h = sheet.height * scale + pad * 2;
+  const partial = options.partial === true;
+  const sheetStroke = partial ? '#f39c12' : '#4a6fa5';
 
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="100%" style="max-height:70vh;background:#1a1a2e">`;
-  svg += `<rect x="${pad}" y="${pad}" width="${sheet.width * scale}" height="${sheet.height * scale}" fill="#2d2d44" stroke="#4a6fa5" stroke-width="2"/>`;
+  svg += `<rect x="${pad}" y="${pad}" width="${sheet.width * scale}" height="${sheet.height * scale}" fill="#2d2d44" stroke="${sheetStroke}" stroke-width="2"/>`;
 
   const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'];
   result.placements.forEach((p, i) => {
