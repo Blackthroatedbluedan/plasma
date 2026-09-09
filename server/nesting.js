@@ -143,6 +143,7 @@ export function nestParts(parts, sheet, options = {}) {
     placements.push({
       partId: inst.partId,
       name: inst.name,
+      instanceIndex: inst.instanceIndex,
       x: best.x,
       y: best.y,
       rotation: best.rotation,
@@ -163,6 +164,88 @@ export function nestParts(parts, sheet, options = {}) {
     scrapPct,
     sheet,
     kerf,
+  };
+}
+
+export function placementBbox(placement) {
+  const bb = bboxOfPolylines(placement.polylines);
+  return { x: placement.x, y: placement.y, w: bb.width, h: bb.height };
+}
+
+export function checkPlacementCollisions(placements, kerf) {
+  const collisions = [];
+  for (let i = 0; i < placements.length; i++) {
+    for (let j = i + 1; j < placements.length; j++) {
+      if (rectsOverlap(placementBbox(placements[i]), placementBbox(placements[j]), kerf)) {
+        collisions.push({ a: i, b: j });
+      }
+    }
+  }
+  return collisions;
+}
+
+export function checkPlacementBounds(placement, sheet, margin = 0.25) {
+  const bb = placementBbox(placement);
+  return (
+    bb.x >= margin &&
+    bb.y >= margin &&
+    bb.x + bb.w <= sheet.width - margin + 0.001 &&
+    bb.y + bb.h <= sheet.height - margin + 0.001
+  );
+}
+
+function expandInstances(parts) {
+  const instances = [];
+  for (const part of parts) {
+    const qty = part.qty || 1;
+    for (let i = 0; i < qty; i++) {
+      instances.push({
+        partId: part.id,
+        name: part.name,
+        polylines: part.polylines,
+        instanceIndex: i,
+      });
+    }
+  }
+  instances.sort((a, b) => polyArea(b.polylines) - polyArea(a.polylines));
+  return instances;
+}
+
+/**
+ * Build nest result from explicit placements (e.g. after manual drag on canvas).
+ */
+export function nestFromPlacements(placements, sheet, options = {}) {
+  const kerf = options.kerf ?? 0.125;
+  const margin = options.margin ?? 0.25;
+
+  if (!placements?.length) {
+    return { success: false, error: 'No placements provided' };
+  }
+
+  const boundsIssues = [];
+  placements.forEach((p, i) => {
+    if (!checkPlacementBounds(p, sheet, margin)) boundsIssues.push(i);
+  });
+  const collisions = checkPlacementCollisions(placements, kerf);
+
+  const partArea = placements.reduce((s, p) => s + polyArea(p.polylines), 0);
+  const sheetArea = sheet.width * sheet.height;
+  const yieldPct = (partArea / sheetArea) * 100;
+
+  return {
+    success: boundsIssues.length === 0 && collisions.length === 0,
+    placements,
+    yieldPct,
+    scrapPct: 100 - yieldPct,
+    sheet,
+    kerf,
+    boundsIssues,
+    collisions,
+    error: boundsIssues.length
+      ? 'One or more parts are outside the sheet margin'
+      : collisions.length
+        ? 'Parts overlap — adjust positions before sending to outbox'
+        : undefined,
   };
 }
 

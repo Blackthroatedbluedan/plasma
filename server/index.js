@@ -8,11 +8,12 @@ import { v4 as uuid } from 'uuid';
 import db from './db.js';
 import './seed.js';
 import { parseDxf, exportNestedDxf } from './dxf.js';
-import { nestParts, nestPreviewSvg } from './nesting.js';
+import { nestParts, nestPreviewSvg, nestFromPlacements } from './nesting.js';
 import { buildPartsQuery, nextRevision } from './parts.js';
 import { diagnoseGeometry, fixGeometry, exportCleanupDxf, CLEANUP_DEFAULTS } from './cleanup.js';
 import { MATERIALS, SHEET_PRESETS } from './seed.js';
-import { ensureInboxOutboxDirs, listInboxFiles, importInboxFile, writeToOutbox } from './inbox.js';
+import { ensureInboxOutboxDirs, listInboxFiles, listRecentProcessed, importInboxFile, startInboxWatcher } from './inbox.js';
+import { writeNestToOutbox, writePartToOutbox, sweepOutbox, getOutboxSweepInfo, startOutboxSweepScheduler } from './outbox.js';
 import {
   buildInventorySyncPayload,
   enqueueInventorySync,
@@ -51,7 +52,45 @@ app.get('/api/config', (_req, res) => {
 
 // --- Inbox / Outbox ---
 app.get('/api/inbox', (_req, res) => {
-  res.json({ files: listInboxFiles() });
+  res.json({
+    files: listInboxFiles(),
+    recentProcessed: listRecentProcessed(10),
+    autoImport: true,
+  });
+});
+
+app.get('/api/outbox', (_req, res) => {
+  res.json(getOutboxSweepInfo());
+});
+
+app.post('/api/outbox/sweep', (req, res) => {
+  try {
+    const force = req.body?.force === true;
+    const result = sweepOutbox({ force });
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/parts/:id/outbox', (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Part not found' });
+    if (!row.dxf_path || !fs.existsSync(row.dxf_path)) {
+      return res.status(404).json({ error: 'Original DXF file not available for this part' });
+    }
+    const content = fs.readFileSync(row.dxf_path, 'utf8');
+    const { filename, path: outPath } = writePartToOutbox(row, content);
+    res.json({
+      ok: true,
+      filename,
+      path: outPath,
+      message: `DXF written to data/outbox/${filename} for FlashCut pickup`,
+    });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 app.post('/api/inbox/import', (req, res) => {
@@ -335,36 +374,72 @@ app.delete('/api/sheets/:id', (req, res) => {
 });
 
 // --- Nesting ---
+function resolveNestInputs(body) {
+  const { partIds, quantities, sheetId, kerf, customSheet, placements } = body;
+  if (!partIds?.length) return { error: 'Select at least one part', status: 400 };
+
+  let sheet;
+  if (sheetId) {
+    const s = db.prepare('SELECT * FROM sheets WHERE id = ? AND status = ?').get(sheetId, 'available');
+    if (!s) return { error: 'Sheet not available', status: 400 };
+    sheet = { id: s.id, width: s.width_in, height: s.height_in, material: s.material, thickness: s.thickness };
+  } else if (customSheet) {
+    sheet = { width: customSheet.width, height: customSheet.height, material: customSheet.material, thickness: customSheet.thickness };
+  } else {
+    return { error: 'Select a sheet or provide custom dimensions', status: 400 };
+  }
+
+  const parts = [];
+  for (const pid of partIds) {
+    const row = db.prepare('SELECT * FROM parts WHERE id = ?').get(pid);
+    if (!row) continue;
+    const geom = JSON.parse(row.geometry_json);
+    parts.push({
+      id: row.id,
+      name: row.name,
+      polylines: geom.polylines,
+      qty: quantities?.[pid] ?? row.qty ?? 1,
+    });
+  }
+
+  const kerfVal = kerf ?? 0.125;
+  let result;
+  if (placements?.length) {
+    result = nestFromPlacements(placements, sheet, { kerf: kerfVal });
+  } else {
+    result = nestParts(parts, sheet, { kerf: kerfVal });
+  }
+
+  return { parts, sheet, kerf: kerfVal, result };
+}
+
+app.post('/api/nest/preview', (req, res) => {
+  try {
+    const resolved = resolveNestInputs(req.body);
+    if (resolved.error) return res.status(resolved.status).json({ error: resolved.error });
+
+    const { sheet, kerf, result } = resolved;
+    if (!result.success && !result.placements?.length) {
+      return res.status(400).json(result);
+    }
+
+    res.json({
+      ...result,
+      sheet,
+      kerf,
+      previewOnly: true,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/api/nest', (req, res) => {
   try {
-    const { partIds, quantities, sheetId, kerf, customSheet } = req.body;
-    if (!partIds?.length) return res.status(400).json({ error: 'Select at least one part' });
+    const resolved = resolveNestInputs(req.body);
+    if (resolved.error) return res.status(resolved.status).json({ error: resolved.error });
 
-    let sheet;
-    if (sheetId) {
-      const s = db.prepare('SELECT * FROM sheets WHERE id = ? AND status = ?').get(sheetId, 'available');
-      if (!s) return res.status(400).json({ error: 'Sheet not available' });
-      sheet = { id: s.id, width: s.width_in, height: s.height_in, material: s.material, thickness: s.thickness };
-    } else if (customSheet) {
-      sheet = { width: customSheet.width, height: customSheet.height, material: customSheet.material, thickness: customSheet.thickness };
-    } else {
-      return res.status(400).json({ error: 'Select a sheet or provide custom dimensions' });
-    }
-
-    const parts = [];
-    for (const pid of partIds) {
-      const row = db.prepare('SELECT * FROM parts WHERE id = ?').get(pid);
-      if (!row) continue;
-      const geom = JSON.parse(row.geometry_json);
-      parts.push({
-        id: row.id,
-        name: row.name,
-        polylines: geom.polylines,
-        qty: quantities?.[pid] ?? row.qty ?? 1,
-      });
-    }
-
-    const result = nestParts(parts, sheet, { kerf: kerf ?? 0.125 });
+    const { parts, sheet, kerf, result } = resolved;
     if (!result.success) return res.status(400).json(result);
 
     const previewSvg = nestPreviewSvg(result, sheet);
@@ -373,18 +448,18 @@ app.post('/api/nest', (req, res) => {
       sheetWidth: sheet.width,
       sheetHeight: sheet.height,
       includeSheetOutline: true,
-      kerf: kerf ?? 0.125,
+      kerf,
     });
     const dxfPath = path.join(exportsDir, `${jobId}.dxf`);
     fs.writeFileSync(dxfPath, nestedDxf);
-    try { writeToOutbox(jobId, nestedDxf); } catch (_) {}
+    try { writeNestToOutbox(jobId, nestedDxf); } catch (_) {}
 
     db.prepare(`
       INSERT INTO jobs (id, sheet_id, material, thickness, sheet_width_in, sheet_height_in, parts_json, nest_json, yield_pct, scrap_pct, status, nested_dxf_path)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
     `).run(
       jobId, sheet.id || null, sheet.material || parts[0]?.material, sheet.thickness || parts[0]?.thickness,
-      sheet.width, sheet.height, JSON.stringify(partIds.map((id) => ({ id, qty: quantities?.[id] }))),
+      sheet.width, sheet.height, JSON.stringify(req.body.partIds.map((id) => ({ id, qty: req.body.quantities?.[id] }))),
       JSON.stringify(result), result.yieldPct, result.scrapPct, dxfPath
     );
 
@@ -489,4 +564,6 @@ if (fs.existsSync(distPath)) {
 
 app.listen(PORT, () => {
   console.log(`Plasma server running on http://localhost:${PORT}`);
+  startInboxWatcher(db);
+  startOutboxSweepScheduler();
 });

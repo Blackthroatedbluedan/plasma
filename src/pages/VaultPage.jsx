@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
+import OutboxBar from '../components/OutboxBar';
+import InlinePartRename from '../components/InlinePartRename';
 
 function useDebounced(value, delay = 300) {
   const [debounced, setDebounced] = useState(value);
@@ -33,29 +35,23 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export default function PartsPage() {
+export default function VaultPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [parts, setParts] = useState([]);
   const [total, setTotal] = useState(0);
   const [config, setConfig] = useState({ materials: {}, sheetPresets: [] });
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('q') || '');
   const debouncedSearch = useDebounced(search);
   const [filterMat, setFilterMat] = useState('');
   const [sort, setSort] = useState('recent');
-  const [selected, setSelected] = useState({});
-  const [showForm, setShowForm] = useState(false);
-  const [revisePart, setRevisePart] = useState(null);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [highlightId, setHighlightId] = useState(null);
-  const [form, setForm] = useState({
-    name: '', material: 'Black Steel', thickness: '1/4"', notes: '', qty: 1, revision: 'A',
-    customer: '', job_ref: '', tags: '',
-  });
-  const [dxfFile, setDxfFile] = useState(null);
+  const [revisePart, setRevisePart] = useState(null);
   const [revDxfFile, setRevDxfFile] = useState(null);
   const [revRevision, setRevRevision] = useState('');
-  const [customMat, setCustomMat] = useState('');
-  const [customThick, setCustomThick] = useState('');
+  const [outboxLoading, setOutboxLoading] = useState(null);
 
   const load = useCallback(() => {
     const params = { sort };
@@ -75,57 +71,24 @@ export default function PartsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const material = customMat || form.material;
-  const thickness = customThick || form.thickness;
-  const gauges = config.materials[material] || [];
-
-  const selectedIds = Object.keys(selected).filter((id) => selected[id]);
-
-  const toggleSelect = (id) => setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
-  const toggleSelectAll = () => {
-    if (selectedIds.length === parts.length) {
-      setSelected({});
-    } else {
-      setSelected(Object.fromEntries(parts.map((p) => [p.id, true])));
-    }
-  };
-
   const goToNest = (ids) => {
     if (!ids.length) return;
-    navigate(`/nest?parts=${ids.join(',')}`);
+    navigate(`/?nest=${ids.join(',')}`);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSendToOutbox = async (part) => {
     setError('');
-    if (!dxfFile) { setError('Select a DXF file'); return; }
-    const fd = new FormData();
-    fd.append('dxf', dxfFile);
-    fd.append('name', form.name);
-    fd.append('material', material);
-    fd.append('thickness', thickness);
-    fd.append('notes', form.notes);
-    fd.append('qty', form.qty);
-    fd.append('revision', form.revision);
-    fd.append('customer', form.customer);
-    fd.append('job_ref', form.job_ref);
-    fd.append('tags', form.tags);
+    setSuccess('');
+    setOutboxLoading(part.id);
     try {
-      const part = await api.createPart(fd);
-      setShowForm(false);
-      setForm({
-        name: '', material: 'Black Steel', thickness: '1/4"', notes: '', qty: 1, revision: 'A',
-        customer: '', job_ref: '', tags: '',
-      });
-      setDxfFile(null);
-      setCustomMat('');
-      setCustomThick('');
-      setSearch('');
+      const result = await api.sendPartToOutbox(part.id);
+      setSuccess(`${part.name} → ${result.filename} in outbox for FlashCut pickup`);
       setHighlightId(part.id);
-      load();
       setTimeout(() => setHighlightId(null), 3000);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setOutboxLoading(null);
     }
   };
 
@@ -150,15 +113,23 @@ export default function PartsPage() {
   const handleDelete = async (id) => {
     if (!confirm('Delete this drawing from the vault?')) return;
     await api.deletePart(id);
-    setSelected((prev) => { const n = { ...prev }; delete n[id]; return n; });
     load();
+  };
+
+  const handlePartRenamed = (updated, errMsg) => {
+    if (errMsg) {
+      setError(errMsg);
+      return;
+    }
+    if (!updated) return;
+    setParts((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
   };
 
   return (
     <div>
-      <h2 className="page-title">Drawing Vault</h2>
+      <h2 className="page-title">Vault</h2>
       <p className="page-desc">
-        Search every shop DXF by name, material, customer, job, or tags — then nest and export without hunting folders.
+        Search every shop DXF. Send a single part to <code>data/outbox/</code> for FlashCut, or open Home to nest multiple parts.
       </p>
 
       <div className="toolbar vault-toolbar">
@@ -177,87 +148,14 @@ export default function PartsPage() {
           <option value="recent">Sort: Recent</option>
           <option value="name">Sort: Name</option>
         </select>
-        <button className="btn btn-primary" onClick={() => setShowForm(true)}>+ Import DXF</button>
       </div>
 
       <div className="vault-meta">
         <span>{total} drawing{total !== 1 ? 's' : ''}{debouncedSearch ? ` matching “${debouncedSearch}”` : ''}</span>
-        {selectedIds.length > 0 && (
-          <div className="bulk-bar">
-            <span>{selectedIds.length} selected</span>
-            <button className="btn btn-primary btn-sm" onClick={() => goToNest(selectedIds)}>Nest selected</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setSelected({})}>Clear</button>
-          </div>
-        )}
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
-
-      {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
-            <h2>Import DXF</h2>
-            <form onSubmit={handleSubmit}>
-              <div className="form-row">
-                <label>DXF File</label>
-                <input type="file" accept=".dxf" onChange={(e) => setDxfFile(e.target.files[0])} required />
-              </div>
-              <div className="form-row">
-                <label>Part Name</label>
-                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-              </div>
-              <div className="grid-2">
-                <div className="form-row">
-                  <label>Material</label>
-                  <select value={form.material} onChange={(e) => setForm({ ...form, material: e.target.value })}>
-                    {Object.keys(config.materials).map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                  <input placeholder="Or custom material…" value={customMat} onChange={(e) => setCustomMat(e.target.value)} style={{ marginTop: 4 }} />
-                </div>
-                <div className="form-row">
-                  <label>Thickness</label>
-                  <select value={form.thickness} onChange={(e) => setForm({ ...form, thickness: e.target.value })}>
-                    {(gauges.length ? gauges : ['custom']).map((g) => <option key={g} value={g}>{g}</option>)}
-                  </select>
-                  <input placeholder="Or custom thickness…" value={customThick} onChange={(e) => setCustomThick(e.target.value)} style={{ marginTop: 4 }} />
-                </div>
-              </div>
-              <div className="grid-2">
-                <div className="form-row">
-                  <label>Customer</label>
-                  <input value={form.customer} onChange={(e) => setForm({ ...form, customer: e.target.value })} placeholder="Optional" />
-                </div>
-                <div className="form-row">
-                  <label>Job</label>
-                  <input value={form.job_ref} onChange={(e) => setForm({ ...form, job_ref: e.target.value })} placeholder="e.g. JOB-2401" />
-                </div>
-              </div>
-              <div className="form-row">
-                <label>Tags</label>
-                <input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="comma-separated: bracket, galv, …" />
-              </div>
-              <div className="grid-2">
-                <div className="form-row">
-                  <label>Qty</label>
-                  <input type="number" min="1" value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} />
-                </div>
-                <div className="form-row">
-                  <label>Revision</label>
-                  <input value={form.revision} onChange={(e) => setForm({ ...form, revision: e.target.value })} />
-                </div>
-              </div>
-              <div className="form-row">
-                <label>Notes</label>
-                <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-              </div>
-              <div style={{ display: 'flex', gap: 0.5, marginTop: 1 }}>
-                <button type="submit" className="btn btn-primary">Import to vault</button>
-                <button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)}>Cancel</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {success && <div className="alert alert-success">{success}</div>}
 
       {revisePart && (
         <div className="modal-overlay" onClick={() => setRevisePart(null)}>
@@ -289,15 +187,12 @@ export default function PartsPage() {
           <div className="empty">
             {debouncedSearch
               ? `No drawings match “${debouncedSearch}”. Try a shorter fragment or clear the search.`
-              : 'No drawings yet. Import a DXF — try the samples in samples/.'}
+              : 'No drawings yet. Drop a DXF in data/inbox/ or try the samples in samples/.'}
           </div>
         ) : (
           <table className="vault-table">
             <thead>
               <tr>
-                <th style={{ width: 36 }}>
-                  <input type="checkbox" checked={parts.length > 0 && selectedIds.length === parts.length} onChange={toggleSelectAll} title="Select all" />
-                </th>
                 <th style={{ width: 52 }}></th>
                 <th>Name</th>
                 <th>Material</th>
@@ -311,12 +206,14 @@ export default function PartsPage() {
             <tbody>
               {parts.map((p) => (
                 <tr key={p.id} className={highlightId === p.id ? 'row-highlight' : ''}>
-                  <td>
-                    <input type="checkbox" checked={!!selected[p.id]} onChange={() => toggleSelect(p.id)} />
-                  </td>
                   <td><PartThumb geometry={p.geometry} /></td>
                   <td>
-                    <strong>{p.name}</strong>
+                    <InlinePartRename
+                      partId={p.id}
+                      name={p.name}
+                      onRenamed={handlePartRenamed}
+                      className="inline-rename-strong"
+                    />
                     {p.tags && <div className="tag-line">{p.tags}</div>}
                     {p.notes && <div className="muted-line">{p.notes}</div>}
                   </td>
@@ -331,7 +228,15 @@ export default function PartsPage() {
                   <td>{formatDate(p.updated_at)}</td>
                   <td>
                     <div className="actions">
-                      <button className="btn btn-primary btn-sm" onClick={() => goToNest([p.id])} title="Open Nest with this part">Nest</button>
+                      <button
+                        className="btn btn-success btn-sm"
+                        onClick={() => handleSendToOutbox(p)}
+                        disabled={outboxLoading === p.id}
+                        title="Copy single-part DXF to data/outbox/ for FlashCut pickup"
+                      >
+                        {outboxLoading === p.id ? '…' : 'Outbox'}
+                      </button>
+                      <button className="btn btn-primary btn-sm" onClick={() => goToNest([p.id])} title="Add to nest on Home">Nest</button>
                       <a className="btn btn-ghost btn-sm" href={api.partDxfUrl(p.id)} download title="Download original DXF">DXF</a>
                       <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/cleanup/${p.id}`)} title="Optional geometry cleanup">Cleanup</button>
                       <button className="btn btn-ghost btn-sm" onClick={() => { setRevisePart(p); setRevRevision(''); setRevDxfFile(null); }}>Rev</button>
@@ -344,6 +249,8 @@ export default function PartsPage() {
           </table>
         )}
       </div>
+
+      <OutboxBar />
     </div>
   );
 }
