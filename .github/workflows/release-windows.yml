@@ -1,0 +1,59 @@
+name: Release Windows installer
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows installer
+        run: npm run desktop:pack
+
+      - name: List release artifacts
+        shell: bash
+        run: ls -la release/
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.exe
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && format('Plasma {0}', github.ref_name) || 'Plasma Latest (main)' }}
+          body: |
+            Windows x64 NSIS installer built from commit ${{ github.sha }}.
+
+            **Shop install:** download `Plasma Setup *.exe`, run the installer, and pin Plasma to the taskbar.
+            Shop data is stored in `%APPDATA%\Plasma\data\`.
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          generate_release_notes: ${{ startsWith(github.ref, 'refs/tags/') }}
+          draft: false
+          make_latest: true
+          overwrite_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -31,6 +31,20 @@ A realistic starter inventory is seeded on first run (mostly 5×10 across common
 - Windows 10/11 (works on macOS/Linux too)
 - Modern browser (Chrome, Edge, Firefox)
 
+## Download (Windows)
+
+For the FlashCut shop laptop — no terminal or Node.js required:
+
+1. Open **[GitHub Releases](https://github.com/Blackthroatedbluedan/plasma/releases)** for this repo.
+2. Download **`Plasma Setup … .exe`** from the newest release:
+   - **Plasma Latest (main)** — auto-built on every merge to `main` (rolling `latest` tag).
+   - **`v*` releases** — versioned builds when a tag like `v1.0.0` is pushed.
+3. Run the installer, then pin **Plasma** to the taskbar.
+
+Shop data (database, inbox, outbox) lives in **`%APPDATA%\Plasma\data\`**. Back up that folder to preserve inventory and parts.
+
+To kick off the first build after the release workflow lands, a maintainer can run **Actions → Release Windows installer → Run workflow** (`workflow_dispatch`).
+
 ## Quick Start (Windows)
 
 ```powershell
@@ -89,9 +103,9 @@ Inside that folder:
 
 Override with `PLASMA_DATA_DIR` if needed. Browser/`npm start` mode still uses `./data/` in the project folder.
 
-### Build installer for FlashCut laptop
+### Build installer locally
 
-Build on a **Windows x64** machine (or CI) with Node 18+:
+For maintainers or offline builds on a **Windows x64** machine with Node 18+:
 
 ```powershell
 npm install
@@ -103,7 +117,9 @@ Output in `release/`:
 - **`Plasma Setup 1.0.0.exe`** — NSIS installer (Start menu + optional desktop shortcut)
 - `npm run desktop:pack:portable` — single **`Plasma-Portable.exe`** (no installer)
 
-Copy the installer to `C:\Plasma` on the shop laptop, run it, and pin **Plasma** to the taskbar. Closing the window quits the app and stops the server. Launching again while already open focuses the existing window (single instance).
+CI publishes the NSIS installer to [GitHub Releases](https://github.com/Blackthroatedbluedan/plasma/releases) on every push to `main` and on `v*` tags (see **Download (Windows)** above). Shop laptops should use that download path instead of building locally.
+
+Closing the Plasma window quits the app and stops the server. Launching again while already open focuses the existing window (single instance).
 
 Recommended shop install path: `C:\Plasma` (or accept the NSIS default under `%LOCALAPPDATA%\Programs\Plasma`).
 
