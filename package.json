@@ -15,8 +15,8 @@
     "rebuild:node": "npm rebuild better-sqlite3",
     "electron": "npm run electron:deps && electron .",
     "desktop": "npm run build && npm run electron",
-    "desktop:pack": "npm run build && electron-builder install-app-deps && electron-builder --win --x64",
-    "desktop:pack:portable": "npm run build && electron-builder install-app-deps && electron-builder --win portable --x64",
+    "desktop:pack": "npm run build && electron-builder install-app-deps && electron-builder --win --x64 --publish never",
+    "desktop:pack:portable": "npm run build && electron-builder install-app-deps && electron-builder --win portable --x64 --publish never",
     "seed": "node server/seed.js",
     "demo:prep": "bash scripts/demo-walkthrough.sh",
     "demo:sweep": "bash scripts/demo-sweep.sh"
