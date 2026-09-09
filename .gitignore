@@ -6,6 +6,7 @@ exports/
 *.db-shm
 node_modules/
 dist/
+release/
 .DS_Store
 .env
 .env.local

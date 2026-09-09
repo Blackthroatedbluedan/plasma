@@ -4,12 +4,19 @@
   "description": "Shop-side overlay for Fab-Cut CNC plasma tables running FlashCut",
   "private": true,
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "node --watch server/index.js",
     "dev:client": "vite",
     "build": "vite build",
     "start": "node server/index.js",
+    "electron:deps": "npx @electron/rebuild -f -w better-sqlite3",
+    "rebuild:node": "npm rebuild better-sqlite3",
+    "electron": "npm run electron:deps && electron .",
+    "desktop": "npm run build && npm run electron",
+    "desktop:pack": "npm run build && electron-builder install-app-deps && electron-builder --win --x64",
+    "desktop:pack:portable": "npm run build && electron-builder install-app-deps && electron-builder --win portable --x64",
     "seed": "node server/seed.js",
     "demo:prep": "bash scripts/demo-walkthrough.sh",
     "demo:sweep": "bash scripts/demo-sweep.sh"
@@ -28,9 +35,54 @@
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
+    "electron": "^34.5.8",
+    "electron-builder": "^25.1.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.5",
     "vite": "^6.0.11"
+  },
+  "build": {
+    "appId": "ca.klfs.plasma",
+    "productName": "Plasma",
+    "copyright": "Copyright © KLFS",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "server/**/*",
+      "electron/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Plasma",
+      "installerIcon": "build/icon.png",
+      "uninstallerIcon": "build/icon.png"
+    },
+    "portable": {
+      "artifactName": "Plasma-Portable.exe"
+    }
   }
 }
