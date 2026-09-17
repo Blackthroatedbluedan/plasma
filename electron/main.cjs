@@ -2,11 +2,12 @@ const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
-const { spawn } = require('child_process');
+const { pathToFileURL } = require('url');
 
 const PORT = Number(process.env.PORT) || 3847;
 let mainWindow = null;
-let serverProcess = null;
+/** @type {{ stop: () => Promise<void> } | null} */
+let serverHandle = null;
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -20,45 +21,20 @@ function getPlasmaDataDir() {
   return path.join(app.getPath('userData'), 'data');
 }
 
-function getProjectRoot() {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'app');
-  }
-  return path.join(__dirname, '..');
-}
-
-function startServer() {
-  const root = getProjectRoot();
+async function startServer() {
   const dataDir = getPlasmaDataDir();
   fs.mkdirSync(dataDir, { recursive: true });
 
-  const env = {
-    ...process.env,
-    PLASMA_DATA_DIR: dataDir,
-    PORT: String(PORT),
-    PLASMA_HOST: '127.0.0.1',
-    ELECTRON_RUN_AS_NODE: '1',
-  };
+  process.env.PLASMA_DATA_DIR = dataDir;
+  process.env.PORT = String(PORT);
+  process.env.PLASMA_HOST = '127.0.0.1';
 
-  const serverEntry = path.join(root, 'server', 'index.js');
-  serverProcess = spawn(process.execPath, [serverEntry], {
-    env,
-    cwd: root,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-
-  serverProcess.stdout.on('data', (chunk) => {
-    process.stdout.write(`[plasma-server] ${chunk}`);
-  });
-  serverProcess.stderr.on('data', (chunk) => {
-    process.stderr.write(`[plasma-server] ${chunk}`);
-  });
-  serverProcess.on('exit', (code, signal) => {
-    if (code !== 0 && code !== null) {
-      console.error(`[plasma-server] exited (code=${code}, signal=${signal})`);
-    }
-    serverProcess = null;
-  });
+  // Load the Express app in-process. Spawning process.execPath with
+  // ELECTRON_RUN_AS_NODE fails on some packaged Windows installs (ENOENT on
+  // Plasma.exe) and child_process.spawn cannot run scripts inside asar.
+  const serverEntry = path.join(app.getAppPath(), 'server', 'index.js');
+  const { startPlasmaServer } = await import(pathToFileURL(serverEntry).href);
+  serverHandle = startPlasmaServer({ port: PORT, host: '127.0.0.1' });
 
   return waitForServer(PORT, 60_000);
 }
@@ -118,9 +94,11 @@ function createWindow() {
 }
 
 function stopServer() {
-  if (!serverProcess) return;
-  serverProcess.kill('SIGTERM');
-  serverProcess = null;
+  if (!serverHandle) return;
+  serverHandle.stop().catch((err) => {
+    console.error('[plasma-server] shutdown error:', err);
+  });
+  serverHandle = null;
 }
 
 app.on('second-instance', () => {
