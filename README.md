@@ -33,7 +33,7 @@ A realistic starter inventory is seeded on first run (mostly 5×10 across common
 
 ## Download (Windows)
 
-For the FlashCut shop laptop — no terminal or Node.js required:
+For the FlashCut shop laptop — no terminal or Node.js required. Full install protocol (paths, data, CI gate, KLFS reuse checklist): **[docs/WINDOWS.md](docs/WINDOWS.md)**.
 
 1. Open **[GitHub Releases](https://github.com/Blackthroatedbluedan/plasma/releases)** for this repo.
 2. Download **`Plasma Setup … .exe`** from the newest release:
