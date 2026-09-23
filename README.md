@@ -6,7 +6,7 @@ Local-first web app that sits beside **FlashCut** on your Windows laptop. Plasma
 
 ## Features (v1 MVP)
 
-- **Home** — Inbox window (auto-import from `data/inbox/`) + nest builder with live preview; exports to `data/outbox/`
+- **Home** — Inbox window (auto-import **DWG or DXF** from `data/inbox/`) + nest builder with live preview; exports to `data/outbox/`
 - **Drawing vault** — Searchable list of every shop DXF (name, material, gauge, customer, job, tags). Send single parts to outbox or add to nest
 - **Sheet & remnant inventory** — Full sheets + rectangular remnants with shop presets (never hard-limited)
 - **Nesting** — Bottom-left-fill with 90° rotation, configurable kerf/gap (~0.125" default), SVG preview
@@ -40,6 +40,7 @@ For the FlashCut shop laptop — no terminal or Node.js required. Full install p
    - **Plasma Latest (main)** — auto-built on every merge to `main` (rolling `latest` tag).
    - **`v*` releases** — versioned builds when a tag like `v1.0.0` is pushed.
 3. Run the installer, then pin **Plasma** to the taskbar.
+4. **First launch (required):** Plasma creates **Plasma Inbox** and **Plasma Outbox** on the Windows Desktop. These point at the real shop folders under `%APPDATA%\Plasma\data\inbox` and `…\outbox` — drop **DWG or DXF** in Inbox; pick up nested DXF from Outbox for FlashCut. No need to browse AppData after install.
 
 Shop data (database, inbox, outbox) lives in **`%APPDATA%\Plasma\data\`**. Back up that folder to preserve inventory and parts.
 
@@ -97,7 +98,7 @@ On first launch the app creates shop data under:
 Inside that folder:
 
 - `plasma.db` — SQLite database
-- `inbox/` — drop DXFs for auto-import
+- `inbox/` — drop **DWG or DXF** for auto-import (DWG is converted to DXF in the vault automatically)
 - `outbox/` — nested DXFs for FlashCut pickup
 - `uploads/`, `exports/` — vault uploads and nest exports
 
@@ -148,7 +149,7 @@ See [docs/klfsapps-inventory-callable.md](docs/klfsapps-inventory-callable.md) f
 
 ## Typical Workflow
 
-1. **Home** — Inbox window shows new DXFs (drop in `data/inbox/` — auto-imports to vault). Build a nest on the right; finished nests land in `data/outbox/` for FlashCut
+1. **Home** — Inbox window shows new shop drawings (drop **`.dwg` or `.dxf`** in `data/inbox/` — auto-imports to vault; DWG is converted to DXF for nesting/FlashCut). Build a nest on the right; finished nests land in `data/outbox/` for FlashCut
 2. **Vault** — Search every shop DXF; send a single part to outbox or add to nest on Home
 3. **Inventory** — Review seeded stock or add sheets/remnants
 4. **Download nested DXF** → import into FlashCut for lead-ins/kerf/torch
@@ -159,6 +160,18 @@ See [docs/klfsapps-inventory-callable.md](docs/klfsapps-inventory-callable.md) f
 Files in `data/outbox/` are swept every **3 days**: older DXFs are archived to `data/outbox/archive/` (vault still holds originals; nest jobs stay in the job log). The server runs a sweep on boot and hourly so downtime does not skip cleanup.
 
 **Demo / dev:** `npm run demo:sweep` forces an immediate archive. Override retention with `OUTBOX_RETENTION_DAYS=0.001` (minutes-scale) for testing without force. See `npm run demo:prep` for a full screen-recording walkthrough script.
+
+## Shop drawing import (DWG-first)
+
+Plasma treats **AutoCAD `.dwg`** as the primary inbox format. Operators can drop files in `data/inbox/` (or the **Plasma Inbox** folder on the Windows desktop — see [docs/WINDOWS.md](docs/WINDOWS.md)). On import, DWG files are converted to **DXF** for vault storage, nesting, and FlashCut export; the part name comes from the file basename (e.g. `bracket-A.dwg` → “Bracket A”). **`.dxf`** files are still accepted unchanged.
+
+Conversion uses **LibreDWG** via the [`@mlightcad/libredwg-web`](https://www.npmjs.com/package/@mlightcad/libredwg-web) WebAssembly bundle shipped inside the Windows installer — **no separate Autodesk install** on the shop laptop. Tested against ACAD 2018–2020 shop DWGs in `fixtures/dwg-samples/`. If conversion fails, the file stays in the inbox and the Home panel shows the error.
+
+**Maintainers / CI:** `npm run test:dwg-inbox` converts all fixture DWGs and runs a full inbox auto-import in a temp data directory.
+
+### Third-party notice (DWG)
+
+`@mlightcad/libredwg-web` is **GPL-3.0**. Plasma loads it only on the server side for inbox conversion; source and license are available via the package on npm and in `node_modules/@mlightcad/libredwg-web` after install.
 
 ## Sample DXFs
 
@@ -186,7 +199,7 @@ Optional, non-blocking tool to diagnose and fix messy DXF geometry (open contour
 
 ## Data Storage
 
-SQLite database at `data/plasma.db` (or `%APPDATA%\Plasma\data\plasma.db` in desktop mode). Uploaded DXFs in `data/uploads/`, exported nests in `data/exports/`. **Drop DXFs in `data/inbox/`** — they auto-import to the vault (no button click). **Finished nests and single-part exports land in `data/outbox/`** for FlashCut pickup; outbox files older than 3 days are archived automatically. Back up the `data/` folder to preserve inventory and parts.
+SQLite database at `data/plasma.db` (or `%APPDATA%\Plasma\data\plasma.db` in desktop mode). Vault geometry is stored as DXF in `data/uploads/` (including DWG imports after conversion), exported nests in `data/exports/`. **Drop DWG or DXF in `data/inbox/`** — they auto-import to the vault (no button click). **Finished nests and single-part exports land in `data/outbox/`** for FlashCut pickup; outbox files older than 3 days are archived automatically. Back up the `data/` folder to preserve inventory and parts.
 
 ## API Endpoints
 
@@ -220,6 +233,7 @@ plasma/
 │   ├── paths.js     Data directory resolution (browser vs desktop)
 │   ├── seed.js      Shop stock seed data
 │   ├── dxf.js       DXF parse & export
+│   ├── dwg.js       DWG → DXF (LibreDWG WASM)
 │   └── nesting.js   Bottom-left-fill nest (90° rotation)
 ├── electron/        Desktop shell (starts server + BrowserWindow)
 ├── src/             Vite + React UI

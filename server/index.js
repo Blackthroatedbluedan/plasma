@@ -14,6 +14,7 @@ import { buildPartsQuery, nextRevision } from './parts.js';
 import { diagnoseGeometry, fixGeometry, exportCleanupDxf, CLEANUP_DEFAULTS } from './cleanup.js';
 import { MATERIALS, SHEET_PRESETS } from './seed.js';
 import { ensureInboxOutboxDirs, listInboxFiles, listRecentProcessed, importInboxFile, startInboxWatcher } from './inbox.js';
+import { getDwgConversionStatus } from './dwg.js';
 import { writeNestToOutbox, writePartToOutbox, sweepOutbox, getOutboxSweepInfo, startOutboxSweepScheduler } from './outbox.js';
 import {
   buildInventorySyncPayload,
@@ -52,6 +53,7 @@ app.get('/api/inbox', (_req, res) => {
     files: listInboxFiles(),
     recentProcessed: listRecentProcessed(10),
     autoImport: true,
+    dwgConversion: getDwgConversionStatus(),
   });
 });
 
@@ -89,21 +91,21 @@ app.post('/api/parts/:id/outbox', (req, res) => {
   }
 });
 
-app.post('/api/inbox/import', (req, res) => {
+app.post('/api/inbox/import', async (req, res) => {
   try {
     const { filenames, material, thickness, moveAfter } = req.body || {};
     const toImport = filenames?.length
       ? filenames
       : listInboxFiles().map((f) => f.filename);
     if (!toImport.length) {
-      return res.status(400).json({ error: 'No DXF files in inbox to import' });
+      return res.status(400).json({ error: 'No DWG or DXF files in inbox to import' });
     }
 
     const imported = [];
     const errors = [];
     for (const filename of toImport) {
       try {
-        const row = importInboxFile(db, filename, {
+        const row = await importInboxFile(db, filename, {
           material: material || 'Black Steel',
           thickness: thickness || '1/4"',
           moveAfter: moveAfter !== false,
