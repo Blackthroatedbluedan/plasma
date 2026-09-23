@@ -3,7 +3,11 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const { pathToFileURL } = require('url');
-const { ensureDesktopFolderLinks } = require('./desktop-links.cjs');
+const {
+  ensureDesktopFolderLinks,
+  PLASMA_INBOX_NAME,
+  PLASMA_OUTBOX_NAME,
+} = require('./desktop-links.cjs');
 
 const PORT = Number(process.env.PORT) || 3847;
 let mainWindow = null;
@@ -38,8 +42,8 @@ function configureLibreDwgWasmPath() {
 
 function ensureWindowsDesktopDataLinks(dataDir) {
   ensureDesktopFolderLinks(app.getPath('desktop'), [
-    { name: 'Plasma Inbox', target: path.join(dataDir, 'inbox') },
-    { name: 'Plasma Outbox', target: path.join(dataDir, 'outbox') },
+    { name: PLASMA_INBOX_NAME, target: path.join(dataDir, 'inbox') },
+    { name: PLASMA_OUTBOX_NAME, target: path.join(dataDir, 'outbox') },
   ]);
 }
 

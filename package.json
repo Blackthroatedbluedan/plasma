@@ -20,7 +20,8 @@
     "seed": "node server/seed.js",
     "demo:prep": "bash scripts/demo-walkthrough.sh",
     "demo:sweep": "bash scripts/demo-sweep.sh",
-    "test:dwg-inbox": "node scripts/test-dwg-inbox.mjs"
+    "test:dwg-inbox": "node scripts/test-dwg-inbox.mjs",
+    "test:desktop-links": "node scripts/test-desktop-links.mjs"
   },
   "dependencies": {
     "@mlightcad/libredwg-web": "^0.7.14",

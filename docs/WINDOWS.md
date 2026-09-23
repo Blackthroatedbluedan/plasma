@@ -8,11 +8,11 @@ Locked shop runbook for the FlashCut laptop and the **KLFS Windows app shape** o
 2. **Shop install:** Operator downloads **`Plasma Setup … .exe`** from Releases. No terminal, npm, or Node on the shop laptop.
 3. **Install location:** Per-user NSIS default: `%LOCALAPPDATA%\Programs\Plasma` (desktop + Start Menu shortcuts). `perMachine: false` in electron-builder.
 4. **Data:** `%APPDATA%\Plasma\data\` (Electron `userData` + `data/`). Created on first launch. Survives reinstall unless the operator deletes AppData. Holds `plasma.db`, `inbox/`, `outbox/`, `uploads/`, `exports/`.
-5. **Desktop drop folders (first launch):** Junctions on the operator’s Desktop — **Plasma Inbox** → `%APPDATA%\Plasma\data\inbox`, **Plasma Outbox** → `%APPDATA%\Plasma\data\outbox`. Idempotent if they already exist and point at the right folders.
-5. **Launch:** One **Plasma** window. Express listens on **`127.0.0.1`** only. Start the server **in-process** in the main Electron process—**do not** spawn a second `Plasma.exe` with `ELECTRON_RUN_AS_NODE` (Windows packaged builds hit **ENOENT**; Plasma uses `startPlasmaServer()` from `server/index.js` instead).
-6. **Native modules:** Run **`electron-builder install-app-deps`** (or `@electron/rebuild`) in the pack step so **better-sqlite3** matches the Electron ABI.
-7. **CI gate:** After `desktop:pack`, on **`windows-latest`**: start the **unpacked** `release\win-unpacked\Plasma.exe` → wait for **`http://127.0.0.1:3847/api/config`** HTTP **200** → stop the app → **fail the job** on timeout/crash → **only then** upload the Release asset.
-8. **Recovery:** Uninstall from Settings → reinstall from a newer Release build. AppData is kept unless the shop wipes `%APPDATA%\Plasma\`.
+5. **Desktop drop folders (required, first launch):** On every Windows Electron start, Plasma ensures Desktop links named exactly **Plasma Inbox** and **Plasma Outbox** point at `%APPDATA%\Plasma\data\inbox` and `…\data\outbox` (the live `PLASMA_DATA_DIR` subdirs). **Junctions** are created when possible; if that fails (policy/permissions), **`.lnk` shortcuts** with the same display names are used instead. If a same-named link already exists and already points at the correct folder, Plasma leaves it alone.
+6. **Launch:** One **Plasma** window. Express listens on **`127.0.0.1`** only. Start the server **in-process** in the main Electron process—**do not** spawn a second `Plasma.exe` with `ELECTRON_RUN_AS_NODE` (Windows packaged builds hit **ENOENT**; Plasma uses `startPlasmaServer()` from `server/index.js` instead).
+7. **Native modules:** Run **`electron-builder install-app-deps`** (or `@electron/rebuild`) in the pack step so **better-sqlite3** matches the Electron ABI.
+8. **CI gate:** After `desktop:pack`, on **`windows-latest`**: start the **unpacked** `release\win-unpacked\Plasma.exe` → wait for **`http://127.0.0.1:3847/api/config`** HTTP **200** → stop the app → **fail the job** on timeout/crash → **only then** upload the Release asset.
+9. **Recovery:** Uninstall from Settings → reinstall from a newer Release build. AppData is kept unless the shop wipes `%APPDATA%\Plasma\`.
 
 ---
 

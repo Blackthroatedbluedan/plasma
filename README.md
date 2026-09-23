@@ -40,6 +40,7 @@ For the FlashCut shop laptop — no terminal or Node.js required. Full install p
    - **Plasma Latest (main)** — auto-built on every merge to `main` (rolling `latest` tag).
    - **`v*` releases** — versioned builds when a tag like `v1.0.0` is pushed.
 3. Run the installer, then pin **Plasma** to the taskbar.
+4. **First launch (required):** Plasma creates **Plasma Inbox** and **Plasma Outbox** on the Windows Desktop. These point at the real shop folders under `%APPDATA%\Plasma\data\inbox` and `…\outbox` — drop **DWG or DXF** in Inbox; pick up nested DXF from Outbox for FlashCut. No need to browse AppData after install.
 
 Shop data (database, inbox, outbox) lives in **`%APPDATA%\Plasma\data\`**. Back up that folder to preserve inventory and parts.
 
