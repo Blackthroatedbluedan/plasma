@@ -57,7 +57,7 @@ try {
   Write-Host 'Smoke: stopping Plasma'
   if (-not $proc.HasExited) {
     Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-    $proc.WaitForExit(15_000) | Out-Null
+    $proc.WaitForExit(15000) | Out-Null
   }
   # Cleanup stray child processes (Electron sometimes spawns helpers)
   Get-Process -Name 'Plasma' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
