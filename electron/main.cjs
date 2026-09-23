@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const { pathToFileURL } = require('url');
+const { ensureDesktopFolderLinks } = require('./desktop-links.cjs');
 
 const PORT = Number(process.env.PORT) || 3847;
 let mainWindow = null;
@@ -21,9 +22,35 @@ function getPlasmaDataDir() {
   return path.join(app.getPath('userData'), 'data');
 }
 
+function configureLibreDwgWasmPath() {
+  const appPath = app.getAppPath();
+  const unpackedWasm = path.join(
+    appPath.replace(/app\.asar$/i, 'app.asar.unpacked'),
+    'node_modules',
+    '@mlightcad',
+    'libredwg-web',
+    'wasm',
+  );
+  if (fs.existsSync(path.join(unpackedWasm, 'libredwg-web.wasm'))) {
+    process.env.PLASMA_LIBREDWG_WASM_DIR = unpackedWasm;
+  }
+}
+
+function ensureWindowsDesktopDataLinks(dataDir) {
+  ensureDesktopFolderLinks(app.getPath('desktop'), [
+    { name: 'Plasma Inbox', target: path.join(dataDir, 'inbox') },
+    { name: 'Plasma Outbox', target: path.join(dataDir, 'outbox') },
+  ]);
+}
+
 async function startServer() {
   const dataDir = getPlasmaDataDir();
   fs.mkdirSync(dataDir, { recursive: true });
+  fs.mkdirSync(path.join(dataDir, 'inbox'), { recursive: true });
+  fs.mkdirSync(path.join(dataDir, 'outbox'), { recursive: true });
+
+  configureLibreDwgWasmPath();
+  ensureWindowsDesktopDataLinks(dataDir);
 
   process.env.PLASMA_DATA_DIR = dataDir;
   process.env.PORT = String(PORT);

@@ -8,6 +8,7 @@ Locked shop runbook for the FlashCut laptop and the **KLFS Windows app shape** o
 2. **Shop install:** Operator downloads **`Plasma Setup … .exe`** from Releases. No terminal, npm, or Node on the shop laptop.
 3. **Install location:** Per-user NSIS default: `%LOCALAPPDATA%\Programs\Plasma` (desktop + Start Menu shortcuts). `perMachine: false` in electron-builder.
 4. **Data:** `%APPDATA%\Plasma\data\` (Electron `userData` + `data/`). Created on first launch. Survives reinstall unless the operator deletes AppData. Holds `plasma.db`, `inbox/`, `outbox/`, `uploads/`, `exports/`.
+5. **Desktop drop folders (first launch):** Junctions on the operator’s Desktop — **Plasma Inbox** → `%APPDATA%\Plasma\data\inbox`, **Plasma Outbox** → `%APPDATA%\Plasma\data\outbox`. Idempotent if they already exist and point at the right folders.
 5. **Launch:** One **Plasma** window. Express listens on **`127.0.0.1`** only. Start the server **in-process** in the main Electron process—**do not** spawn a second `Plasma.exe` with `ELECTRON_RUN_AS_NODE` (Windows packaged builds hit **ENOENT**; Plasma uses `startPlasmaServer()` from `server/index.js` instead).
 6. **Native modules:** Run **`electron-builder install-app-deps`** (or `@electron/rebuild`) in the pack step so **better-sqlite3** matches the Electron ABI.
 7. **CI gate:** After `desktop:pack`, on **`windows-latest`**: start the **unpacked** `release\win-unpacked\Plasma.exe` → wait for **`http://127.0.0.1:3847/api/config`** HTTP **200** → stop the app → **fail the job** on timeout/crash → **only then** upload the Release asset.
@@ -24,6 +25,8 @@ Locked shop runbook for the FlashCut laptop and the **KLFS Windows app shape** o
 | Download | [Releases → `latest`](https://github.com/Blackthroatedbluedan/plasma/releases/tag/latest) (or any `v*` tag) |
 | Install dir | `%LOCALAPPDATA%\Programs\Plasma` |
 | Shop data | `%APPDATA%\Plasma\data\` |
+| Desktop inbox / outbox | `%USERPROFILE%\Desktop\Plasma Inbox` → `…\data\inbox`, `Plasma Outbox` → `…\data\outbox` |
+| Inbox formats | **`.dwg`** (primary) and **`.dxf`** — DWG converted to DXF on import (LibreDWG WASM bundled in the app; no Autodesk install) |
 | Health URL | `http://127.0.0.1:3847/api/config` |
 | CI smoke | `scripts/smoke-packaged-windows.ps1` after `npm run desktop:pack` |
 
@@ -67,6 +70,6 @@ Pick a **dedicated localhost port** per app and document the health URL in that 
 1. Open [Plasma Releases](https://github.com/Blackthroatedbluedan/plasma/releases/tag/latest).
 2. Download **Plasma Setup … .exe** and run it.
 3. Pin **Plasma** to the taskbar.
-4. Drop DXFs in `%APPDATA%\Plasma\data\inbox\`; pick up nests from `outbox\`.
+4. Drop shop **DWG or DXF** in **Plasma Inbox** on the Desktop (or `%APPDATA%\Plasma\data\inbox\`); pick up nests from **Plasma Outbox**.
 
 Back up `%APPDATA%\Plasma\data\` before major Windows upgrades or when replacing the laptop.
