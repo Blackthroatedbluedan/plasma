@@ -486,7 +486,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   color: var(--text);
 }
 .nest-result { margin-top: 0.75rem; }
-.nest-live-preview { margin-bottom: 0.75rem; }
+.nest-live-preview { margin-bottom: 0; }
 .nest-preview-meta {
   font-size: 0.8rem;
   margin-bottom: 0.35rem;
