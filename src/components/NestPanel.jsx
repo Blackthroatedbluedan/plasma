@@ -189,36 +189,6 @@ export default function NestPanel({ preselectIds = [], onPreselectConsumed }) {
         </div>
       </div>
 
-      {selectedParts.length === 0 ? (
-        <div className="empty compact">Add parts from the vault to build a nest</div>
-      ) : (
-        <ul className="nest-part-list">
-          {selectedParts.map((p) => (
-            <li key={p.id}>
-              <span>
-                <InlinePartRename
-                  partId={p.id}
-                  name={p.name}
-                  onRenamed={handlePartRenamed}
-                  className="inline-rename-strong"
-                />
-                <span className="muted-line"> {p.material} {p.thickness}</span>
-              </span>
-              <div className="nest-part-controls">
-                <input
-                  type="number" min="1" value={quantities[p.id] || 1}
-                  onChange={(e) => {
-                    setManualLayout(false);
-                    setQuantities({ ...quantities, [p.id]: +e.target.value });
-                  }}
-                />
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => removePart(p.id)}>×</button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
       <div className="nest-sheet-row">
         <select
           aria-label="Sheet"
@@ -245,28 +215,64 @@ export default function NestPanel({ preselectIds = [], onPreselectConsumed }) {
         />
       </div>
 
-      {sheetDims && displayPlacements.length > 0 && (
-        <div className="nest-live-preview">
-          <div className="nest-preview-meta muted-line">
-            {yieldPct != null ? `${yieldPct.toFixed(1)}% yield` : '—'}
-            <span className="nest-preview-meta-sep">·</span>
-            {displayPlacements.length} placed
+      <div className="nest-preview-block">
+        {sheetDims && displayPlacements.length > 0 ? (
+          <div className="nest-live-preview">
+            <div className="nest-preview-meta muted-line">
+              {yieldPct != null ? `${yieldPct.toFixed(1)}% yield` : '—'}
+              <span className="nest-preview-meta-sep">·</span>
+              {displayPlacements.length} placed
+            </div>
+            <NestCanvas
+              sheet={sheetDims}
+              placements={displayPlacements}
+              kerf={kerf}
+              onPlacementsChange={handlePlacementsChange}
+              loading={previewLoading}
+            />
           </div>
-          <NestCanvas
-            sheet={sheetDims}
-            placements={displayPlacements}
-            kerf={kerf}
-            onPlacementsChange={handlePlacementsChange}
-            loading={previewLoading}
-          />
-        </div>
-      )}
-
-      {previewLoading && !displayPlacements.length && (
-        <div className="empty compact">Computing nest preview…</div>
-      )}
+        ) : previewLoading ? (
+          <div className="empty compact nest-preview-placeholder">Computing nest preview…</div>
+        ) : (
+          <div className="empty compact nest-preview-placeholder">
+            {selectedParts.length ? 'Select a sheet to preview the nest' : 'Add parts to preview the nest'}
+          </div>
+        )}
+      </div>
 
       {previewError && <div className="alert alert-error">{previewError}</div>}
+
+      <div className="nest-parts-section">
+        {selectedParts.length === 0 ? (
+          <div className="empty compact">Add parts from the vault to build a nest</div>
+        ) : (
+          <ul className="nest-part-list">
+            {selectedParts.map((p) => (
+              <li key={p.id}>
+                <span>
+                  <InlinePartRename
+                    partId={p.id}
+                    name={p.name}
+                    onRenamed={handlePartRenamed}
+                    className="inline-rename-strong"
+                  />
+                  <span className="muted-line"> {p.material} {p.thickness}</span>
+                </span>
+                <div className="nest-part-controls">
+                  <input
+                    type="number" min="1" value={quantities[p.id] || 1}
+                    onChange={(e) => {
+                      setManualLayout(false);
+                      setQuantities({ ...quantities, [p.id]: +e.target.value });
+                    }}
+                  />
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => removePart(p.id)}>×</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <button
         className="btn btn-primary"
