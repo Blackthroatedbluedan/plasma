@@ -189,39 +189,9 @@ export default function NestPanel({ preselectIds = [], onPreselectConsumed }) {
         </div>
       </div>
 
-      {selectedParts.length === 0 ? (
-        <div className="empty compact">Add parts from the vault to build a nest</div>
-      ) : (
-        <ul className="nest-part-list">
-          {selectedParts.map((p) => (
-            <li key={p.id}>
-              <span>
-                <InlinePartRename
-                  partId={p.id}
-                  name={p.name}
-                  onRenamed={handlePartRenamed}
-                  className="inline-rename-strong"
-                />
-                <span className="muted-line"> {p.material} {p.thickness}</span>
-              </span>
-              <div className="nest-part-controls">
-                <input
-                  type="number" min="1" value={quantities[p.id] || 1}
-                  onChange={(e) => {
-                    setManualLayout(false);
-                    setQuantities({ ...quantities, [p.id]: +e.target.value });
-                  }}
-                />
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => removePart(p.id)}>×</button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
       <div className="nest-sheet-row">
-        <label>Sheet</label>
         <select
+          aria-label="Sheet"
           value={sheetId}
           onChange={(e) => {
             setManualLayout(false);
@@ -235,38 +205,74 @@ export default function NestPanel({ preselectIds = [], onPreselectConsumed }) {
             </option>
           ))}
         </select>
-        <label className="kerf-label">Kerf</label>
-        <input type="number" step="0.01" value={kerf} onChange={(e) => { setManualLayout(false); setKerf(+e.target.value); }} />
+        <input
+          type="number"
+          step="0.01"
+          aria-label="Kerf (in)"
+          title="Kerf (in)"
+          value={kerf}
+          onChange={(e) => { setManualLayout(false); setKerf(+e.target.value); }}
+        />
       </div>
 
-      {sheetDims && displayPlacements.length > 0 && (
-        <div className="nest-live-preview">
-          <div className="stats compact">
-            <div className="stat">
-              <div className="stat-value">{yieldPct != null ? yieldPct.toFixed(1) : '—'}%</div>
-              <div className="stat-label">Yield</div>
+      <div className="nest-preview-block">
+        {sheetDims && displayPlacements.length > 0 ? (
+          <div className="nest-live-preview">
+            <div className="nest-preview-meta muted-line">
+              {yieldPct != null ? `${yieldPct.toFixed(1)}% yield` : '—'}
+              <span className="nest-preview-meta-sep">·</span>
+              {displayPlacements.length} placed
             </div>
-            <div className="stat">
-              <div className="stat-value">{displayPlacements.length}</div>
-              <div className="stat-label">Placed</div>
-            </div>
+            <NestCanvas
+              sheet={sheetDims}
+              placements={displayPlacements}
+              kerf={kerf}
+              onPlacementsChange={handlePlacementsChange}
+              loading={previewLoading}
+            />
           </div>
-          <NestCanvas
-            sheet={sheetDims}
-            placements={displayPlacements}
-            kerf={kerf}
-            onPlacementsChange={handlePlacementsChange}
-            loading={previewLoading}
-          />
-          <p className="muted-line nest-hint">Drag parts to adjust. Scroll or use +/− to zoom — 1″ grid appears when zoomed in.</p>
-        </div>
-      )}
-
-      {previewLoading && !displayPlacements.length && (
-        <div className="empty compact">Computing nest preview…</div>
-      )}
+        ) : previewLoading ? (
+          <div className="empty compact nest-preview-placeholder">Computing nest preview…</div>
+        ) : (
+          <div className="empty compact nest-preview-placeholder">
+            {selectedParts.length ? 'Select a sheet to preview the nest' : 'Add parts to preview the nest'}
+          </div>
+        )}
+      </div>
 
       {previewError && <div className="alert alert-error">{previewError}</div>}
+
+      <div className="nest-parts-section">
+        {selectedParts.length === 0 ? (
+          <div className="empty compact">Add parts from the vault to build a nest</div>
+        ) : (
+          <ul className="nest-part-list">
+            {selectedParts.map((p) => (
+              <li key={p.id}>
+                <span>
+                  <InlinePartRename
+                    partId={p.id}
+                    name={p.name}
+                    onRenamed={handlePartRenamed}
+                    className="inline-rename-strong"
+                  />
+                  <span className="muted-line"> {p.material} {p.thickness}</span>
+                </span>
+                <div className="nest-part-controls">
+                  <input
+                    type="number" min="1" value={quantities[p.id] || 1}
+                    onChange={(e) => {
+                      setManualLayout(false);
+                      setQuantities({ ...quantities, [p.id]: +e.target.value });
+                    }}
+                  />
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => removePart(p.id)}>×</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <button
         className="btn btn-primary"
@@ -280,10 +286,7 @@ export default function NestPanel({ preselectIds = [], onPreselectConsumed }) {
 
       {exportResult && (
         <div className="nest-result">
-          <div className="nest-result-actions">
-            <button className="btn btn-success btn-sm" onClick={downloadDxf}>Download DXF</button>
-            <span className="muted-line">Written to <code>data/outbox/</code> for FlashCut</span>
-          </div>
+          <button className="btn btn-success btn-sm" onClick={downloadDxf}>Download DXF</button>
         </div>
       )}
 
