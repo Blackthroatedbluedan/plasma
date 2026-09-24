@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Convert fixture DWGs to DXF and run inbox import against a temp data dir.
+ * DWG inbox import: conversion, vault naming, and nest readiness.
  * Usage: node scripts/test-dwg-inbox.mjs
  */
 import fs from 'fs';
@@ -10,6 +10,15 @@ import { fileURLToPath } from 'url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fixturesDir = path.join(root, 'fixtures', 'dwg-samples');
+
+function assert(cond, message) {
+  if (!cond) {
+    console.error('ASSERT:', message);
+    process.exitCode = 1;
+    return false;
+  }
+  return true;
+}
 
 async function main() {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plasma-dwg-test-'));
@@ -25,11 +34,12 @@ async function main() {
   }
 
   for (const name of dwgs) {
-    fs.copyFileSync(path.join(fixturesDir, name), path.join(inbox, name));
+    const shopName = `KLFS-Bracket-${name.slice(0, 6)}.dwg`;
+    fs.copyFileSync(path.join(fixturesDir, name), path.join(inbox, shopName));
   }
 
   const { getDwgConversionStatus, convertDwgToDxfText } = await import('../server/dwg.js');
-  const { parseDxf } = await import('../server/dxf.js');
+  const { parseDxf, partNameFromFilename } = await import('../server/dxf.js');
   const status = getDwgConversionStatus();
   if (!status.available) {
     console.error('DWG conversion not available:', status.error);
@@ -37,27 +47,61 @@ async function main() {
   }
 
   console.log('DWG conversion OK (wasm:', status.wasmDir, ')');
-  let failed = 0;
+  let failed = process.exitCode || 0;
+
   for (const name of dwgs) {
-    const buf = fs.readFileSync(path.join(inbox, name));
+    const shopName = `KLFS-Bracket-${name.slice(0, 6)}.dwg`;
+    assert(
+      partNameFromFilename(shopName) === `KLFS-Bracket-${name.slice(0, 6)}`,
+      `partNameFromFilename preserves shop basename for ${shopName}`,
+    );
+    const buf = fs.readFileSync(path.join(inbox, shopName));
     try {
       const dxf = await convertDwgToDxfText(buf);
       const geom = parseDxf(dxf);
-      console.log(`  ${name}: DXF ${dxf.length} chars, bbox ${geom.bbox.width.toFixed(2)}×${geom.bbox.height.toFixed(2)}`);
+      console.log(
+        `  ${shopName}: bbox ${geom.bbox.width.toFixed(2)}×${geom.bbox.height.toFixed(2)} in, ${geom.polylines.length} loops`,
+      );
+      if (geom.bbox.width < 1e-6 || geom.bbox.height < 1e-6) {
+        console.error(`  ${shopName}: invalid bbox`);
+        failed = 1;
+      }
     } catch (e) {
-      failed += 1;
-      console.error(`  ${name}: FAIL`, e.message);
+      failed = 1;
+      console.error(`  ${shopName}: FAIL`, e.message);
     }
   }
 
   const dbMod = await import('../server/db.js');
   const db = dbMod.default;
   const { autoImportInbox } = await import('../server/inbox.js');
+  const { nestParts } = await import('../server/nesting.js');
   const result = await autoImportInbox(db);
   console.log('Auto-import:', result.imported.length, 'imported,', result.errors.length, 'errors');
   if (result.errors.length) {
     for (const err of result.errors) console.error(' ', err.filename, err.error);
-    failed += result.errors.length;
+    failed = 1;
+  }
+
+  for (const row of result.imported) {
+    const expected = partNameFromFilename(row.filename);
+    if (!assert(row.name === expected, `vault name ${row.name} should be ${expected}`)) {
+      failed = 1;
+    }
+  }
+
+  const sheet = { width: 60, height: 120 };
+  const first = db.prepare('SELECT * FROM parts ORDER BY created_at ASC LIMIT 1').get();
+  if (first) {
+    const geom = JSON.parse(first.geometry_json);
+    const nest = nestParts(
+      [{ id: first.id, name: first.name, polylines: geom.polylines, qty: 1 }],
+      sheet,
+      { kerf: 0.125 },
+    );
+    assert(nest.success, `converted DWG part "${first.name}" should nest on 60×120 sheet`);
+    if (!nest.success) failed = 1;
+    else console.log(`Nest OK for "${first.name}" on 60×120 (${nest.placements.length} placement)`);
   }
 
   fs.rmSync(dataDir, { recursive: true, force: true });
