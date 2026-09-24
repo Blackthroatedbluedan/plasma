@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuid } from 'uuid';
-import { parseDxf } from './dxf.js';
+import { parseDxf, partNameFromFilename } from './dxf.js';
 import { ensureOutboxDirs } from './outbox.js';
 import { getDataDir, ensureDataSubdir } from './paths.js';
 import {
@@ -56,10 +56,9 @@ export function listInboxFiles() {
     .sort((a, b) => a.filename.localeCompare(b.filename));
 }
 
+/** @deprecated Use partNameFromFilename from dxf.js */
 export function nameFromFilename(filename) {
-  return path.basename(filename, path.extname(filename))
-    .replace(/[-_]+/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return partNameFromFilename(filename);
 }
 
 function moveToProcessed(filename) {
@@ -109,7 +108,7 @@ export async function importInboxFile(db, filename, { material = 'Black Steel', 
 
   const { dxfText, sourceNote } = await readInboxDxfContent(filename);
   const geometry = parseDxf(dxfText);
-  const name = nameFromFilename(filename);
+  const name = partNameFromFilename(filename);
   const id = uuid();
   const destPath = path.join(ensureDataSubdir('uploads'), `${id}.dxf`);
   fs.writeFileSync(destPath, dxfText, 'utf8');

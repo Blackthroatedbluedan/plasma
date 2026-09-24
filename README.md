@@ -163,7 +163,9 @@ Files in `data/outbox/` are swept every **3 days**: older DXFs are archived to `
 
 ## Shop drawing import (DWG-first)
 
-Plasma treats **AutoCAD `.dwg`** as the primary inbox format. Operators can drop files in `data/inbox/` (or the **Plasma Inbox** folder on the Windows desktop — see [docs/WINDOWS.md](docs/WINDOWS.md)). On import, DWG files are converted to **DXF** for vault storage, nesting, and FlashCut export; the part name comes from the file basename (e.g. `bracket-A.dwg` → “Bracket A”). **`.dxf`** files are still accepted unchanged.
+Plasma treats **AutoCAD `.dwg`** as the primary inbox format. Operators can drop files in `data/inbox/` (or the **Plasma Inbox** folder on the Windows desktop — see [docs/WINDOWS.md](docs/WINDOWS.md)). On import, DWG files are converted to **DXF** for vault storage, nesting, and FlashCut export; the vault part name is the **original file basename** (e.g. `bracket-A.dwg` → `bracket-A`, not a hash or generic placeholder). **`.dxf`** files are still accepted unchanged.
+
+Converted geometry is normalized to **inches** for nesting (using DXF `$INSUNITS`, with block inserts expanded into model space).
 
 Conversion uses **LibreDWG** via the [`@mlightcad/libredwg-web`](https://www.npmjs.com/package/@mlightcad/libredwg-web) WebAssembly bundle shipped inside the Windows installer — **no separate Autodesk install** on the shop laptop. Tested against ACAD 2018–2020 shop DWGs in `fixtures/dwg-samples/`. If conversion fails, the file stays in the inbox and the Home panel shows the error.
 
