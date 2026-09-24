@@ -10,7 +10,7 @@ const MARGIN = 0.25;
 const FIT_PAD = 0.75;
 const GRID_ZOOM_THRESHOLD = 1.05;
 
-function clientPointToSheet(svg, clientX, clientY) {
+function clientPointToView(svg, clientX, clientY) {
   const pt = svg.createSVGPoint();
   pt.x = clientX;
   pt.y = clientY;
@@ -18,6 +18,12 @@ function clientPointToSheet(svg, clientX, clientY) {
   if (!ctm) return { x: 0, y: 0 };
   const { x, y } = pt.matrixTransform(ctm);
   return { x, y };
+}
+
+/** Map SVG viewBox coords to sheet placement coords (inverse of portrait→landscape display). */
+function viewPointToSheet(x, y, sheetW, landscape) {
+  if (!landscape) return { x, y };
+  return { x: sheetW - y, y: x };
 }
 
 export default function NestCanvas({
@@ -54,8 +60,17 @@ export default function NestCanvas({
 
   const sheetW = sheet?.width ?? 1;
   const sheetH = sheet?.height ?? 1;
-  const viewW = sheetW + FIT_PAD * 2;
-  const viewH = sheetH + FIT_PAD * 2;
+  const landscapeLayout = sheetH > sheetW;
+  const drawW = landscapeLayout ? sheetH : sheetW;
+  const drawH = landscapeLayout ? sheetW : sheetH;
+  const viewW = drawW + FIT_PAD * 2;
+  const viewH = drawH + FIT_PAD * 2;
+  const sheetTransform = landscapeLayout ? `translate(0, ${sheetW}) rotate(-90)` : undefined;
+
+  const toSheetPoint = (clientX, clientY) => {
+    const view = clientPointToView(svgRef.current, clientX, clientY);
+    return viewPointToSheet(view.x, view.y, sheetW, landscapeLayout);
+  };
   const fitScale = Math.min(size.w / viewW, size.h / viewH);
   const scale = fitScale * zoom;
 
@@ -84,7 +99,7 @@ export default function NestCanvas({
   const onPointerDown = (e, index) => {
     if (!onPlacementsChange) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    const pt = clientPointToSheet(svgRef.current, e.clientX, e.clientY);
+    const pt = toSheetPoint(e.clientX, e.clientY);
     const placement = placements[index];
     setDrag({
       index,
@@ -95,7 +110,7 @@ export default function NestCanvas({
 
   const onPointerMove = (e) => {
     if (!drag || !onPlacementsChange) return;
-    const pt = clientPointToSheet(svgRef.current, e.clientX, e.clientY);
+    const pt = toSheetPoint(e.clientX, e.clientY);
     const next = placements.map((p, i) => {
       if (i !== drag.index) return p;
       return clampPlacement(
@@ -131,8 +146,7 @@ export default function NestCanvas({
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => zoomBy(1.25)} title="Zoom in">+</button>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => zoomBy(0.8)} title="Zoom out">−</button>
         <button type="button" className="btn btn-ghost btn-sm" onClick={fitToView} title="Fit sheet">Fit</button>
-        <span className="nest-canvas-zoom muted-line">{Math.round(zoom * 100)}%</span>
-        {loading && <span className="muted-line">Updating…</span>}
+        {loading && <span className="nest-canvas-status muted-line">Updating…</span>}
       </div>
 
       <div
@@ -150,6 +164,7 @@ export default function NestCanvas({
           onPointerLeave={onPointerUp}
         >
           <g transform={`translate(${tx / scale}, ${ty / scale})`}>
+            <g transform={sheetTransform}>
             {showGrid && (
               <g className="nest-grid" pointerEvents="none">
                 {gridLines.map((line, i) =>
@@ -199,6 +214,7 @@ export default function NestCanvas({
                 </g>
               );
             })}
+            </g>
           </g>
         </svg>
       </div>

@@ -220,8 +220,8 @@ export default function NestPanel({ preselectIds = [], onPreselectConsumed }) {
       )}
 
       <div className="nest-sheet-row">
-        <label>Sheet</label>
         <select
+          aria-label="Sheet"
           value={sheetId}
           onChange={(e) => {
             setManualLayout(false);
@@ -235,21 +235,22 @@ export default function NestPanel({ preselectIds = [], onPreselectConsumed }) {
             </option>
           ))}
         </select>
-        <label className="kerf-label">Kerf</label>
-        <input type="number" step="0.01" value={kerf} onChange={(e) => { setManualLayout(false); setKerf(+e.target.value); }} />
+        <input
+          type="number"
+          step="0.01"
+          aria-label="Kerf (in)"
+          title="Kerf (in)"
+          value={kerf}
+          onChange={(e) => { setManualLayout(false); setKerf(+e.target.value); }}
+        />
       </div>
 
       {sheetDims && displayPlacements.length > 0 && (
         <div className="nest-live-preview">
-          <div className="stats compact">
-            <div className="stat">
-              <div className="stat-value">{yieldPct != null ? yieldPct.toFixed(1) : '—'}%</div>
-              <div className="stat-label">Yield</div>
-            </div>
-            <div className="stat">
-              <div className="stat-value">{displayPlacements.length}</div>
-              <div className="stat-label">Placed</div>
-            </div>
+          <div className="nest-preview-meta muted-line">
+            {yieldPct != null ? `${yieldPct.toFixed(1)}% yield` : '—'}
+            <span className="nest-preview-meta-sep">·</span>
+            {displayPlacements.length} placed
           </div>
           <NestCanvas
             sheet={sheetDims}
@@ -258,7 +259,6 @@ export default function NestPanel({ preselectIds = [], onPreselectConsumed }) {
             onPlacementsChange={handlePlacementsChange}
             loading={previewLoading}
           />
-          <p className="muted-line nest-hint">Drag parts to adjust. Scroll or use +/− to zoom — 1″ grid appears when zoomed in.</p>
         </div>
       )}
 
@@ -280,10 +280,7 @@ export default function NestPanel({ preselectIds = [], onPreselectConsumed }) {
 
       {exportResult && (
         <div className="nest-result">
-          <div className="nest-result-actions">
-            <button className="btn btn-success btn-sm" onClick={downloadDxf}>Download DXF</button>
-            <span className="muted-line">Written to <code>data/outbox/</code> for FlashCut</span>
-          </div>
+          <button className="btn btn-success btn-sm" onClick={downloadDxf}>Download DXF</button>
         </div>
       )}
 
